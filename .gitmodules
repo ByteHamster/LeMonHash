@@ -1,0 +1,9 @@
+[submodule "extlib/pgm-index"]
+	path = extlib/pgm-index
+	url = git@github.com:gvinciguerra/PGM-index.git
+[submodule "extlib/util"]
+	path = extlib/util
+	url = git@github.com:ByteHamster/Util.git
+[submodule "extlib/simpleRibbon"]
+	path = extlib/simpleRibbon
+	url = git@github.com:ByteHamster/SimpleRibbon.git
