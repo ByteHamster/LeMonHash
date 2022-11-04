@@ -1,0 +1,22 @@
+name: Build
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --assume-yes --no-install-recommends build-essential cmake git autoconf libtbb-dev libxxhash-dev
+      - uses: actions/checkout@v2
+        with:
+          submodules: recursive
+      - name: Build
+        run: |
+          cmake -B ./build
+          cmake --build ./build --parallel
