@@ -23,4 +23,8 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     add_executable(IntegerDistributions benchmark/integerDistributions.cpp)
     target_compile_features(IntegerDistributions PRIVATE cxx_std_20)
     target_link_libraries(IntegerDistributions PRIVATE DirectRankStoring tlx)
+
+    add_executable(StringDistributions benchmark/stringDistributions.cpp)
+    target_compile_features(StringDistributions PRIVATE cxx_std_20)
+    target_link_libraries(StringDistributions PRIVATE DirectRankStoring tlx)
 endif()
