@@ -1,6 +1,6 @@
 #pragma once
 
-#include "util.h"
+#include "chunking_strategy/support/util.h"
 
 /**
  * Only converts the first 8 bytes to a compressible chunk.

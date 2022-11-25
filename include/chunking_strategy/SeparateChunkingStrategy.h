@@ -1,6 +1,6 @@
 #pragma once
 
-#include "util.h"
+#include "chunking_strategy/support/util.h"
 
 /**
  * Converts the chunks of the entire string.
