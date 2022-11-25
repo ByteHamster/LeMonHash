@@ -7,6 +7,7 @@
 #include "MultiRetrievalDataStructure.hpp"
 #include "bucket_mapping/LinearBucketMapper.hpp"
 #include "bucket_mapping/PgmBucketMapper.hpp"
+#include "bucket_mapping/SuccinctPgmBucketMapper.hpp"
 
 /**
  * Monotone Minimal Perfect Hash Function (MMPHF) using the Direct Rank Storing (DRS) technique.
@@ -35,10 +36,13 @@ class DirectRankStoringMmphf {
             std::vector<std::vector<uint64_t>> buckets;
             buckets.resize(bucketMapper.numBuckets);
 
-            for (uint64_t key : data) {
+            for (size_t i = 0; i < data.size(); i++) {
                 // In a final version, this would be solved by a linear scan
                 // instead of actually hashing objects to bucket data structures
+                uint64_t &key = data.at(i);
                 buckets.at(bucketMapper.bucketOf(key)).push_back(key);
+                assert(i == 0 || data.at(i) > data.at(i - 1));
+                assert(i == 0 || bucketMapper.bucketOf(data.at(i)) >= bucketMapper.bucketOf(data.at(i - 1)));
             }
             size_t bucketSizePrefixTemp = 0;
             for (auto & bucket : buckets) {

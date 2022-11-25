@@ -78,6 +78,7 @@ int main(int argc, char** argv) {
     simpleMmphfBenchmark<DirectRankStoringMmphf<LinearBucketMapper<1.0f>>>(inputData);
     simpleMmphfBenchmark<DirectRankStoringMmphf<LinearBucketMapper<1.125f>>>(inputData);
     simpleMmphfBenchmark<DirectRankStoringMmphf<PgmBucketMapper<1.0f>>>(inputData);
+    simpleMmphfBenchmark<DirectRankStoringMmphf<SuccinctPgmBucketMapper<>>>(inputData);
 
     return 0;
 }
