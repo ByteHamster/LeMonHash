@@ -89,6 +89,7 @@ public:
         make_segmentation_mod(last_n, epsilon_value, in_fun, out_fun, true);
 
         ys_data.push_back(n);
+        yshifts_data.push_back(epsilon_value);
         xs = new xs_type(xs_data.size(), xs_data.back() + 1);
         ys = new ys_type(ys_data.size(), ys_data.back() + 1);
         for (auto x: xs_data)
@@ -133,19 +134,15 @@ public:
 private:
 
     [[nodiscard]] std::tuple<int64_t, int64_t, int64_t> get_ys(size_t point_index) const {
-        auto shift1 = int64_t(yshifts[point_index * 2]) - int64_t(epsilon_value);
-        auto shift2 = int64_t(yshifts[point_index * 2 + 1]) - int64_t(epsilon_value);
-
         auto p = ys->at(point_index);
         int64_t y0 = *p;
-        ++p;
-        int64_t y1 = *p;
-        ++p;
-        int64_t y2 = *p;
+        int64_t y1 = *++p;
 
-        y0 -= shift1;
-        y1 -= shift2;
-        return {y0, y1, y2};
+        auto shift1 = int64_t(yshifts[point_index * 2]) - int64_t(epsilon_value);
+        auto shift2 = int64_t(yshifts[point_index * 2 + 1]) - int64_t(epsilon_value);
+        auto shift3 = int64_t(yshifts[point_index * 2 + 2]) - int64_t(epsilon_value);
+
+        return {y0 - shift1, y1 - shift2, y1 - shift3};
     }
 
     [[nodiscard]] std::tuple<size_t, K, K> segment_for_key(K key) const {

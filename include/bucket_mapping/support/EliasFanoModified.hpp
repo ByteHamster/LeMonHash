@@ -101,7 +101,7 @@ public:
             return *this;
         }
 
-        uint64_t operator *() {
+        uint64_t operator *() const {
             assert(positionL < fano->count);
             if (fano->lowerBits == 0) {
                 return h;

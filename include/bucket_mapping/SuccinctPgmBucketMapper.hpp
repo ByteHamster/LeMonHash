@@ -5,7 +5,7 @@
 /**
  * Uses a succinct version of the PGM Index to get an approximate rank, which we use as bucket index.
  */
-template <size_t Epsilon = 64>
+template <size_t Epsilon = 31>
 struct SuccinctPgmBucketMapper {
     pgm::SuccinctPGMIndex<uint64_t, Epsilon> pgmIndex;
     size_t numBuckets;
