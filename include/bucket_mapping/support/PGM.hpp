@@ -156,6 +156,22 @@ public:
         return std::min<size_t>((*it)(k), std::next(it)->intercept);
     }
 
+    /** Execute a given function for each key in the sorted range [first, last). The function takes as the argument
+     * a key and the corresponding approximate rank computed by the index. */
+    template<typename RandomIt, typename F>
+    void for_each(RandomIt first, RandomIt last, F f) {
+        auto segment_it = segments.begin();
+        auto it = first;
+        while (it != last) {
+            if (*it >= std::next(segment_it)->key)
+                ++segment_it;
+            auto pos = std::min<size_t>((*segment_it)(*it), std::next(segment_it)->intercept);;
+            assert(std::abs(int64_t(pos) - int64_t(std::distance(first, it))) <= epsilon + 1);
+            f(*it, pos);
+            ++it;
+        }
+    }
+
     [[nodiscard]] size_t epsilon_value() const { return epsilon; }
 
     /**
