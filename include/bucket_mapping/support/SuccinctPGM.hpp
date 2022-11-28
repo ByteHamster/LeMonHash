@@ -57,13 +57,7 @@ public:
         std::vector<size_t> yshifts_data;
         yshifts.width(sdsl::bits::hi(2 * epsilon_value) + 1);
 
-        auto in_fun = [&](auto i) {
-            auto x = first[i];
-            // Here there is an adjustment for inputs with duplicate keys: at the end of a run of duplicate keys equal
-            // to x=first[i] such that x+1!=first[i+1], we map the values x+1,...,first[i+1]-1 to their correct rank i
-            auto flag = i > 0 && i + 1u < n && x == first[i - 1] && x != first[i + 1] && x + 1 != first[i + 1];
-            return std::pair<K, size_t>(x + flag, i);
-        };
+        auto in_fun = [&](auto i) { return std::pair<K, size_t>(first[i], i); };
 
         typename OptimalPiecewiseLinearModel<K, size_t>::CanonicalSegment prev_cs;
         auto out_fun = [&](auto cs, auto last_point) {
