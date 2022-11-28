@@ -22,7 +22,7 @@ struct SeparateChunkingStrategy {
         chunks.resize(maxLCP / 8 + 1);
     }
 
-    SeparateChunkingStrategy(SeparateChunkingStrategy && rhs) {
+    SeparateChunkingStrategy(SeparateChunkingStrategy && rhs) noexcept {
         maxLCP = rhs.maxLCP;
         mmphfs = rhs.mmphfs;
         rhs.mmphfs.clear();
@@ -58,19 +58,14 @@ struct SeparateChunkingStrategy {
     }
 
     std::string compress(std::string &string) const {
-        std::string newString;
+        StringBuilder builder;
         const char *str = string.c_str();
         size_t length = std::min(maxLCP + 1, string.length());
-        size_t i = 0;
-        for (; i < length; i += 8) {
-            size_t encodedChunkWidth = bytesNeeded(mmphfs.at(i / 8ul)->N + 1);
+        for (size_t i = 0; i < length; i += 8) {
             size_t chunkIndex = mmphfs.at(i / 8ul)->operator()(readChunk(str + i, length - i));
-            appendChunkIndex(newString, chunkIndex, encodedChunkWidth);
+            builder.appendInt(chunkIndex + 1, BITS_NEEDED(mmphfs.at(i / 8ul)->N + 1));
         }
-        if (i < length) {
-            newString.append(string.data() + i, length - i);
-        }
-        return newString;
+        return builder.toString();
     }
 
     size_t spaceBits() {

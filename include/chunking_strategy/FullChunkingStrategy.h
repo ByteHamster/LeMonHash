@@ -20,7 +20,7 @@ struct FullChunkingStrategy {
             : maxLCP(maxLCP) {
     }
 
-    FullChunkingStrategy(FullChunkingStrategy && rhs) {
+    FullChunkingStrategy(FullChunkingStrategy && rhs) noexcept {
         maxLCP = rhs.maxLCP;
         mmphf = rhs.mmphf;
         rhs.mmphf = nullptr;
@@ -50,15 +50,14 @@ struct FullChunkingStrategy {
     }
 
     std::string compress(std::string &string) const {
-        size_t encodedChunkWidth = bytesNeeded(mmphf->N + 1);
-        std::string newString;
+        StringBuilder builder;
         const char *str = string.c_str();
         size_t length = std::min(maxLCP + 1, string.length());
         for (size_t i = 0; i < length; i += 8) {
             size_t chunkIndex = mmphf->operator()(readChunk(str + i, length - i));
-            appendChunkIndex(newString, chunkIndex, encodedChunkWidth);
+            builder.appendInt(chunkIndex + 1, BITS_NEEDED(mmphf->N + 1));
         }
-        return newString;
+        return builder.toString();
     }
 
     size_t spaceBits() {

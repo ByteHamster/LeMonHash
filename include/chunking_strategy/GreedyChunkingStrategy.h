@@ -21,7 +21,7 @@ struct GreedyChunkingStrategy {
             : maxLCP(maxLCP) {
     }
 
-    GreedyChunkingStrategy(GreedyChunkingStrategy && rhs) {
+    GreedyChunkingStrategy(GreedyChunkingStrategy && rhs) noexcept {
         maxLCP = rhs.maxLCP;
         mmphf = rhs.mmphf;
         rhs.mmphf = nullptr;
@@ -47,14 +47,13 @@ struct GreedyChunkingStrategy {
     }
 
     std::string compress(std::string &string) const {
-        size_t encodedChunkWidth = bytesNeeded(mmphf->N + 1);
-        std::string newString;
+        StringBuilder builder;
         size_t chunkIndex = mmphf->operator()(readChunk(string.c_str(), string.length()));
-        appendChunkIndex(newString, chunkIndex, encodedChunkWidth);
+        builder.appendInt(chunkIndex + 1, BITS_NEEDED(mmphf->N + 1));
         if (string.length() >= 8) {
-            newString.append(string.data() + 8, string.length() - 8);
+            return builder.toString() + string.substr(8);
         }
-        return newString;
+        return builder.toString();
     }
 
     size_t spaceBits() {

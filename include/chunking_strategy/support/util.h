@@ -4,6 +4,7 @@
 #include <string>
 #include <unordered_set>
 #include <algorithm>
+#include "StringBuilder.hpp"
 
 std::string toHexString(const char *string, size_t length) {
     char* str = new char[3*length+1];
@@ -19,6 +20,28 @@ std::string toHexString(std::string &string) {
     return toHexString(string.c_str(), string.length());
 }
 
+std::string toBinaryString(const char *string, size_t length) {
+    char* str = new char[9*length+1];
+    for (size_t i = 0; i < length; i++) {
+        std::snprintf(str + i * 9, 10, " %c%c%c%c%c%c%c%c",
+                  (string[i] & 0x80 ? '1' : '0'),
+                  (string[i] & 0x40 ? '1' : '0'),
+                  (string[i] & 0x20 ? '1' : '0'),
+                  (string[i] & 0x10 ? '1' : '0'),
+                  (string[i] & 0x08 ? '1' : '0'),
+                  (string[i] & 0x04 ? '1' : '0'),
+                  (string[i] & 0x02 ? '1' : '0'),
+                  (string[i] & 0x01 ? '1' : '0'));
+    }
+    std::string cppstr(str);
+    delete[] str;
+    return cppstr;
+}
+
+std::string toBinaryString(std::string &string) {
+    return toBinaryString(string.c_str(), string.length());
+}
+
 size_t LCP(std::string &s1, std::string &s2) {
     size_t lcp = 0;
     size_t minLength = std::min(s1.length(), s2.length());
@@ -30,15 +53,7 @@ size_t LCP(std::string &s1, std::string &s2) {
     return lcp;
 }
 
-size_t bytesNeeded(uint64_t i) {
-    size_t bytesNeeded = 8;
-    uint64_t mask = (~0ul) >> 8;
-    while (i == (i & mask)) {
-        bytesNeeded--;
-        mask = mask >> 8;
-    }
-    return bytesNeeded;
-}
+#define BITS_NEEDED(x) (64 - __builtin_clzll(x))
 
 /**
  * Reads an 8-byte prefix of a string to a uint64_t.
@@ -52,11 +67,4 @@ uint64_t readChunk(const char *string, size_t maxLength) {
         chunkRaw[7 - i] = string[i];
     }
     return chunk;
-}
-
-void appendChunkIndex(std::string &string, size_t chunkIndex, size_t width) {
-    chunkIndex++; // String end (\0) must be smaller than all chunk indices
-    for (size_t k = 0; k < width; k++) {
-        string += ((char*) &chunkIndex)[width - k - 1];
-    }
 }
