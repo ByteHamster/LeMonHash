@@ -6,15 +6,14 @@
 
 namespace pgm {
 
-template<typename K, size_t Epsilon = 64>
+template<typename K>
 class SuccinctPGMIndex {
 protected:
-    static_assert(Epsilon > 0);
-
     using xs_type = util::EliasFanoM;
     using ys_type = util::EliasFanoM;
 
     size_t n;
+    uint16_t epsilon;
     K first_key;
     xs_type *xs;
     ys_type *ys;
@@ -22,31 +21,24 @@ protected:
 
 public:
 
-    static constexpr size_t epsilon_value = Epsilon;
-
     /**
      * Constructs an empty index.
      */
     SuccinctPGMIndex() = default;
 
     /**
-     * Constructs the index on the given sorted vector.
-     * @param data the vector of keys to be indexed, must be sorted
-     */
-    explicit SuccinctPGMIndex(const std::vector<K> &data) : SuccinctPGMIndex(data.begin(), data.end()) {}
-
-    /**
      * Constructs the index on the sorted keys in the range [first, last).
      * @param first, last the range containing the sorted keys to be indexed
      */
     template<typename RandomIt>
-    SuccinctPGMIndex(RandomIt first, RandomIt last)
+    SuccinctPGMIndex(RandomIt first, RandomIt last, uint16_t epsilon)
         : n(std::distance(first, last)),
+          epsilon(epsilon),
           first_key(n ? *first : K(0))  {
         if (n == 0)
             return;
 
-        using namespace internal2;
+        using namespace internal;
 
         auto ignore_last = *std::prev(last) == std::numeric_limits<K>::max(); // max() is the sentinel value
         auto last_n = n - ignore_last;
@@ -55,7 +47,7 @@ public:
         std::vector<K> xs_data = {0};
         std::vector<size_t> ys_data = {0};
         std::vector<size_t> yshifts_data;
-        yshifts.width(sdsl::bits::hi(2 * epsilon_value) + 1);
+        yshifts.width(sdsl::bits::hi(2 * epsilon) + 1);
 
         auto in_fun = [&](auto i) { return std::pair<K, size_t>(first[i], i); };
 
@@ -67,8 +59,8 @@ public:
             auto y1 = cs.rectangle[3].y;
             auto eval1 = evaluate(cs.first.x, x0, x1, y0, y1);
             auto eval2 = evaluate(last_point.first, x0, x1, y0, y1);
-            auto yshift1 = cs.first.y - eval1 + epsilon_value;
-            auto yshift2 = last_point.second - eval2 + epsilon_value;
+            auto yshift1 = cs.first.y - eval1 + epsilon;
+            auto yshift2 = last_point.second - eval2 + epsilon;
             if (yshift1 < 0 || yshift2 < 0
                 || sdsl::bits::hi(yshift1) + 1 > yshifts.width()
                 || sdsl::bits::hi(yshift2) + 1 > yshifts.width())
@@ -80,10 +72,10 @@ public:
             yshifts_data.push_back(yshift2);
         };
 
-        make_segmentation_mod(last_n, epsilon_value, in_fun, out_fun, true);
+        make_segmentation_mod(last_n, epsilon, in_fun, out_fun, true);
 
         ys_data.push_back(n);
-        yshifts_data.push_back(epsilon_value);
+        yshifts_data.push_back(epsilon);
         xs = new xs_type(xs_data.size(), xs_data.back() + 1);
         ys = new ys_type(ys_data.size(), ys_data.back() + 1);
         for (auto x: xs_data)
@@ -114,8 +106,7 @@ public:
             }
             auto eval = evaluate(*it - first_key, x0, x1, y0, y1);
             auto pos = std::min<size_t>(eval > 0 ? size_t(eval) : 0ull, y2);
-            auto true_pos = std::distance(first, it);
-            assert(std::abs(int64_t(pos) - int64_t(true_pos)) <= epsilon_value + 1);
+            assert(std::abs(int64_t(pos) - int64_t(std::distance(first, it))) <= epsilon + 1);
             f(*it, pos);
             ++it;
         }
@@ -142,6 +133,8 @@ public:
      */
     [[nodiscard]] size_t size_in_bytes() const { return xs->space() + ys->space() + sdsl::size_in_bytes(yshifts); }
 
+    [[nodiscard]] size_t epsilon_value() const { return epsilon; }
+
     ~SuccinctPGMIndex() {
         delete xs;
         delete ys;
@@ -158,9 +151,9 @@ private:
         int64_t y0 = *p;
         int64_t y1 = *++p;
 
-        auto shift1 = int64_t(yshifts[point_index * 2]) - int64_t(epsilon_value);
-        auto shift2 = int64_t(yshifts[point_index * 2 + 1]) - int64_t(epsilon_value);
-        auto shift3 = int64_t(yshifts[point_index * 2 + 2]) - int64_t(epsilon_value);
+        auto shift1 = int64_t(yshifts[point_index * 2]) - int64_t(epsilon);
+        auto shift2 = int64_t(yshifts[point_index * 2 + 1]) - int64_t(epsilon);
+        auto shift3 = int64_t(yshifts[point_index * 2 + 2]) - int64_t(epsilon);
 
         return {y0 - shift1, y1 - shift2, y1 - shift3};
     }

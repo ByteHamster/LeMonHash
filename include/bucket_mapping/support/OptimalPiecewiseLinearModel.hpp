@@ -25,7 +25,7 @@
 #include <utility>
 #include <vector>
 
-namespace pgm::internal2 {
+namespace pgm::internal {
 
 template<typename T>
 using LargeSigned = typename std::conditional_t<std::is_floating_point_v<T>,
@@ -208,6 +208,54 @@ struct OptimalPiecewiseLinearModel<X, Y>::CanonicalSegment {
     bool one_point() const {
         return rectangle[0].x == rectangle[2].x && rectangle[0].y == rectangle[2].y
             && rectangle[1].x == rectangle[3].x && rectangle[1].y == rectangle[3].y;
+    }
+
+    std::pair<long double, long double> get_intersection() const {
+        auto &p0 = rectangle[0];
+        auto &p1 = rectangle[1];
+        auto &p2 = rectangle[2];
+        auto &p3 = rectangle[3];
+        auto slope1 = p2 - p0;
+        auto slope2 = p3 - p1;
+
+        if (one_point() || slope1 == slope2)
+            return {p0.x, p0.y};
+
+        auto p0p1 = p1 - p0;
+        auto a = slope1.dx * slope2.dy - slope1.dy * slope2.dx;
+        auto b = (p0p1.dx * slope2.dy - p0p1.dy * slope2.dx) / static_cast<long double>(a);
+        auto i_x = p0.x + b * slope1.dx;
+        auto i_y = p0.y + b * slope1.dy;
+        return {i_x, i_y};
+    }
+
+    std::pair<long double, SY> get_floating_point_segment(const X &origin) const {
+        if (one_point())
+            return {0, (rectangle[0].y + rectangle[1].y) / 2};
+
+        if constexpr (std::is_integral_v<X> && std::is_integral_v<Y>) {
+            auto slope = rectangle[3] - rectangle[1];
+            auto intercept_n = slope.dy * (SX(origin) - rectangle[1].x);
+            auto intercept_d = slope.dx;
+            auto rounding_term = ((intercept_n < 0) ^ (intercept_d < 0) ? -1 : +1) * intercept_d / 2;
+            auto intercept = (intercept_n + rounding_term) / intercept_d + rectangle[1].y;
+            return {static_cast<long double>(slope), intercept};
+        }
+
+        auto[i_x, i_y] = get_intersection();
+        auto[min_slope, max_slope] = get_slope_range();
+        auto slope = (min_slope + max_slope) / 2.;
+        auto intercept = i_y - (i_x - origin) * slope;
+        return {slope, intercept};
+    }
+
+    std::pair<long double, long double> get_slope_range() const {
+        if (one_point())
+            return {0, 1};
+
+        auto min_slope = static_cast<long double>(rectangle[2] - rectangle[0]);
+        auto max_slope = static_cast<long double>(rectangle[3] - rectangle[1]);
+        return {min_slope, max_slope};
     }
 
 };

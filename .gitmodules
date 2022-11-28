@@ -1,6 +1,3 @@
-[submodule "extlib/pgm-index"]
-	path = extlib/pgm-index
-	url = git@github.com:gvinciguerra/PGM-index.git
 [submodule "extlib/util"]
 	path = extlib/util
 	url = git@github.com:ByteHamster/Util.git

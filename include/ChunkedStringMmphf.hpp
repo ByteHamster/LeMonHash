@@ -12,7 +12,7 @@ template <typename ChunkingStrategy>
 class ChunkedStringMmphf {
     private:
         std::vector<ChunkingStrategy> chunkingLayers;
-        using Mmphf = DirectRankStoringMmphf<PgmBucketMapper<1.0f>>;
+        using Mmphf = DirectRankStoringMmphf<PgmBucketMapper>;
         Mmphf *mmphf = nullptr;
         size_t N;
     public:

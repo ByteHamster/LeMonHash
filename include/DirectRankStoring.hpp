@@ -3,7 +3,6 @@
 #include <iostream>
 #include <EliasFano.h>
 #include <Function.h>
-#include <pgm/pgm_index.hpp>
 #include "MultiRetrievalDataStructure.hpp"
 #include "bucket_mapping/LinearBucketMapper.hpp"
 #include "bucket_mapping/PgmBucketMapper.hpp"

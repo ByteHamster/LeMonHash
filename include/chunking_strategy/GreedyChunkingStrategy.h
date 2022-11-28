@@ -8,7 +8,7 @@
  * Idea: Quickly "eat up" common prefixes without having full compression tables.
  */
 struct GreedyChunkingStrategy {
-    using Mmphf = DirectRankStoringMmphf<PgmBucketMapper<1.0f>>;
+    using Mmphf = DirectRankStoringMmphf<PgmBucketMapper>;
     Mmphf *mmphf = nullptr;
     std::unordered_set<uint64_t> chunks;
     size_t maxLCP;

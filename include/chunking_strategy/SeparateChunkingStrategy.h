@@ -7,7 +7,7 @@
  * Each chunk position is stored in its own retrieval data structure.
  */
 struct SeparateChunkingStrategy {
-    using Mmphf = DirectRankStoringMmphf<PgmBucketMapper<1.0f>>;
+    using Mmphf = DirectRankStoringMmphf<PgmBucketMapper>;
     size_t maxLCP;
     std::vector<Mmphf *> mmphfs;
     std::vector<std::unordered_set<uint64_t>> chunks;
