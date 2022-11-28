@@ -65,8 +65,8 @@ public:
             auto y0 = cs.rectangle[1].y;
             auto x1 = cs.rectangle[3].x;
             auto y1 = cs.rectangle[3].y;
-            auto eval1 = y0 + ((__int128(cs.first.x) - x0) * (y1 - y0)) / (x1 - x0);
-            auto eval2 = y0 + ((__int128(last_point.first) - x0) * (y1 - y0)) / (x1 - x0);
+            auto eval1 = evaluate(cs.first.x, x0, x1, y0, y1);
+            auto eval2 = evaluate(last_point.first, x0, x1, y0, y1);
             auto yshift1 = cs.first.y - eval1 + epsilon_value;
             auto yshift2 = last_point.second - eval2 + epsilon_value;
             if (yshift1 < 0 || yshift2 < 0
@@ -97,11 +97,35 @@ public:
         std::copy(yshifts_data.begin(), yshifts_data.end(), yshifts.begin());
     }
 
+    /** Execute a given function for each key in the sorted range [first, last). The function takes as the argument
+     * a key and the corresponding approximate rank computed by the index. */
+    template<typename RandomIt, typename F>
+    void for_each(RandomIt first, RandomIt last, F f) {
+        size_t segment_i = 0;
+        auto [x0, x1] = segment_at(0);
+        auto [y0, y1, y2] = get_ys(0);
+        auto it = first;
+        while (it != last) {
+            assert(*it >= first_key);
+            if (*it >= first_key + x1 && segment_i != segments_count() - 2) {
+                ++segment_i;
+                std::tie(x0, x1) = segment_at(segment_i);
+                std::tie(y0, y1, y2) = get_ys(segment_i);
+            }
+            auto eval = evaluate(*it - first_key, x0, x1, y0, y1);
+            auto pos = std::min<size_t>(eval > 0 ? size_t(eval) : 0ull, y2);
+            auto true_pos = std::distance(first, it);
+            assert(std::abs(int64_t(pos) - int64_t(true_pos)) <= epsilon_value + 1);
+            f(*it, pos);
+            ++it;
+        }
+    }
+
     [[nodiscard]] size_t approximate_rank(K key) const {
         auto k = std::max(first_key, key);
         auto [point_index, x0, x1] = segment_for_key(k - first_key);
         auto [y0, y1, y2] = get_ys(point_index);
-        auto eval = y0 + (__int128(k - (x0 + first_key)) * (y1 - y0)) / (x1 - x0);
+        auto eval = evaluate(k - first_key, x0, x1, y0, y1);
         auto pos = std::min<size_t>(eval > 0 ? size_t(eval) : 0ull, y2);
         return pos;
     }
@@ -116,9 +140,7 @@ public:
      * Returns the size of the index in bytes.
      * @return the size of the index in bytes
      */
-    [[nodiscard]] size_t size_in_bytes() const {
-        return xs->space() + ys->space() + sdsl::size_in_bytes(yshifts);
-    }
+    [[nodiscard]] size_t size_in_bytes() const { return xs->space() + ys->space() + sdsl::size_in_bytes(yshifts); }
 
     ~SuccinctPGMIndex() {
         delete xs;
@@ -126,6 +148,10 @@ public:
     }
 
 private:
+
+    [[nodiscard]] size_t evaluate(K k, K x0, K x1, int64_t y0, int64_t y1) const {
+        return y0 + ((__int128(k) - x0) * (y1 - y0)) / (x1 - x0);
+    }
 
     [[nodiscard]] std::tuple<int64_t, int64_t, int64_t> get_ys(size_t point_index) const {
         auto p = ys->at(point_index);
@@ -140,12 +166,18 @@ private:
     }
 
     [[nodiscard]] std::tuple<size_t, K, K> segment_for_key(K key) const {
-        auto p = key >= xs->universe_size() - 1 ? xs->at(xs->size() - 2) : xs->predecessorPosition(key);
+        auto p = key >= xs->universe_size() - 1 ? xs->at(segments_count() - 2) : xs->predecessorPosition(key);
         auto np = p;
         ++np;
         return {p.index(), *p, *np};
     }
 
+    [[nodiscard]] std::pair<K, K> segment_at(size_t i) const {
+        auto p = xs->at(i);
+        auto np = p;
+        ++np;
+        return {*p, *np};
+    }
 };
 
 }
