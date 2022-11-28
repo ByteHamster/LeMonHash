@@ -30,4 +30,8 @@ struct LinearBucketMapper {
         return std::string("LinearBucketMapper")
                + " elementsPerBucket=" + std::to_string(elementsPerBucket());
     }
+
+    [[nodiscard]] std::string info() const {
+        return "numBuckets=" + std::to_string(numBuckets) + " u=" + std::to_string(u);
+    }
 };
