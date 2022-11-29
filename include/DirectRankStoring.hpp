@@ -32,33 +32,41 @@ class DirectRankStoringMmphf {
                 : N(data.size()),
                   bucketMapper(data.begin(), data.end()),
                   bucketSizePrefix(bucketMapper.numBuckets + 1, data.size() + 1) {
-            std::vector<std::vector<uint64_t>> buckets;
-            buckets.resize(bucketMapper.numBuckets);
+
+            std::vector<uint64_t> currentBucket;
+            size_t prev_bucket = 0;
+            size_t bucketSizePrefixTemp = 0;
+
+            auto constructBucket = [&] {
+                size_t bucketSize = currentBucket.size();
+                if (bucketSize > 1) {
+                    for (size_t j = 0; j < bucketSize; j++) {
+                        retrievalDataStructure.addInput(bucketSize, currentBucket.at(j), j);
+                    }
+                }
+                bucketSizePrefix.push_back(bucketSizePrefixTemp);
+                bucketSizePrefixTemp += bucketSize;
+                currentBucket.clear();
+            };
 
             bucketMapper.bucketOf(data.begin(), data.end(), [&] (auto it, auto bucket) {
-                buckets.at(bucket).push_back(*it);
-                static size_t prev_bucket;
                 if (it != data.begin()) {
                     if (*it <= *std::prev(it))
                         throw std::invalid_argument("Data not sorted or duplicates found");
                     if (bucket < prev_bucket)
                         throw std::runtime_error("Non-monotonic bucket mapper");
                 }
-                prev_bucket = bucket;
+                while (bucket != prev_bucket) {
+                    constructBucket();
+                    prev_bucket++;
+                }
+                currentBucket.push_back(*it);
             });
 
-            size_t bucketSizePrefixTemp = 0;
-            for (auto & bucket : buckets) {
-                size_t bucketSize = bucket.size();
-                for (size_t j = 0; j < bucketSize; j++) {
-                    if (bucketSize > 1) {
-                        retrievalDataStructure.addInput(bucketSize, bucket.at(j), j);
-                    }
-                }
-                bucketSizePrefix.push_back(bucketSizePrefixTemp);
-                bucketSizePrefixTemp += bucketSize;
+            while (prev_bucket < bucketMapper.numBuckets + 1) {
+                constructBucket();
+                prev_bucket++;
             }
-            bucketSizePrefix.push_back(bucketSizePrefixTemp);
             bucketSizePrefix.buildRankSelect();
 
             retrievalDataStructure.build();
