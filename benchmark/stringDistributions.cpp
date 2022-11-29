@@ -101,13 +101,26 @@ int main(int argc, char** argv) {
     struct LayeredChunking {
         static ChunkingStrategy *createLayer(size_t maxLCP, size_t layer) {
             if (layer == 0) {
-                return new FullChunkingStrategy(maxLCP, 3);
+                return new FullChunkingStrategy(maxLCP, 3); // Alphabet reduction
             } else {
                 return new FullChunkingStrategy(maxLCP, 8);
             }
         }
     };
     simpleMmphfBenchmark<ChunkedStringMmphf<LayeredChunking>>(inputData);
+
+    struct LayeredChunkingForUrls {
+        static ChunkingStrategy *createLayer(size_t maxLCP, size_t layer) {
+            if (layer == 0) {
+                return new FullChunkingStrategy(maxLCP, 3); // Alphabet reduction
+            } else if (layer == 1) {
+                return new SeparateChunkingStrategy(maxLCP, 8); // Use similarity of first chunks
+            } else {
+                return new FullChunkingStrategy(maxLCP, 8);
+            }
+        }
+    };
+    simpleMmphfBenchmark<ChunkedStringMmphf<LayeredChunkingForUrls>>(inputData);
 
     return 0;
 }
