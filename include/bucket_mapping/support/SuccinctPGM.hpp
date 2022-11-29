@@ -90,9 +90,9 @@ public:
     }
 
     /** Execute a given function for each key in the sorted range [first, last). The function takes as the argument
-     * a key and the corresponding approximate rank computed by the index. */
-    template<typename RandomIt, typename F>
-    void for_each(RandomIt first, RandomIt last, F f) {
+     * an iterator to the current key and the corresponding approximate rank computed by the index. */
+    template<typename ForwardIt, typename F>
+    void for_each(ForwardIt first, ForwardIt last, F f) {
         size_t segment_i = 0;
         auto [x0, x1] = segment_at(0);
         auto [y0, y1, y2] = get_ys(0);
@@ -107,7 +107,7 @@ public:
             auto eval = evaluate(*it - first_key, x0, x1, y0, y1);
             auto pos = std::min<size_t>(eval > 0 ? size_t(eval) : 0ull, y2);
             assert(std::abs(int64_t(pos) - int64_t(std::distance(first, it))) <= epsilon + 1);
-            f(*it, pos);
+            f(it, pos);
             ++it;
         }
     }

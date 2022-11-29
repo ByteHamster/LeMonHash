@@ -35,14 +35,18 @@ class DirectRankStoringMmphf {
             std::vector<std::vector<uint64_t>> buckets;
             buckets.resize(bucketMapper.numBuckets);
 
-            for (size_t i = 0; i < data.size(); i++) {
-                // In a final version, this would be solved by a linear scan
-                // instead of actually hashing objects to bucket data structures
-                uint64_t &key = data.at(i);
-                buckets.at(bucketMapper.bucketOf(key)).push_back(key);
-                assert(i == 0 || data.at(i) > data.at(i - 1));
-                assert(i == 0 || bucketMapper.bucketOf(data.at(i)) >= bucketMapper.bucketOf(data.at(i - 1)));
-            }
+            bucketMapper.bucketOf(data.begin(), data.end(), [&] (auto it, auto bucket) {
+                buckets.at(bucket).push_back(*it);
+                static size_t prev_bucket;
+                if (it != data.begin()) {
+                    if (*it <= *std::prev(it))
+                        throw std::invalid_argument("Data not sorted or duplicates found");
+                    if (bucket < prev_bucket)
+                        throw std::runtime_error("Non-monotonic bucket mapper");
+                }
+                prev_bucket = bucket;
+            });
+
             size_t bucketSizePrefixTemp = 0;
             for (auto & bucket : buckets) {
                 size_t bucketSize = bucket.size();

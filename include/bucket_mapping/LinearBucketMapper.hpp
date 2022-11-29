@@ -18,6 +18,14 @@ struct LinearBucketMapper {
         return std::min(numBuckets - 1, key / (u / (numBuckets - 1)));
     }
 
+    template<typename ForwardIt, typename F>
+    void bucketOf(ForwardIt first, ForwardIt last, F f) const {
+        while (first != last) {
+            f(first, bucketOf(*first));
+            ++first;
+        }
+    }
+
     [[nodiscard]] size_t size() const {
         return sizeof(*this);
     }

@@ -41,6 +41,11 @@ struct PgmBucketMapper {
         return pgmIndex.approximate_rank(key);
     }
 
+    template<typename ForwardIt, typename F>
+    void bucketOf(ForwardIt first, ForwardIt last, F f) const {
+        pgmIndex.for_each(first, last, f);
+    }
+
     [[nodiscard]] size_t size() const {
         return sizeof(*this) + pgmIndex.size_in_bytes();
     }
