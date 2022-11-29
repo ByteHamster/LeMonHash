@@ -7,7 +7,7 @@
  * Chunks of all positions are handled together.
  */
 struct FullChunkingStrategy {
-    using Mmphf = DirectRankStoringMmphf<PgmBucketMapper>;
+    using Mmphf = DirectRankStoringMmphf<SuccinctPgmBucketMapper>;
     Mmphf *mmphf = nullptr;
     size_t maxLCP;
     std::unordered_set<uint64_t> chunks;
