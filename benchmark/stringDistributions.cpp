@@ -77,8 +77,37 @@ int main(int argc, char** argv) {
         inputData = loadFile(filename, N);
     }
 
-    simpleMmphfBenchmark<ChunkedStringMmphf<FullChunkingStrategy>>(inputData);
-    //simpleMmphfBenchmark<ChunkedStringMmphf<GreedyChunkingStrategy>>(inputData); // Very slow
-    simpleMmphfBenchmark<ChunkedStringMmphf<SeparateChunkingStrategy>>(inputData);
+    struct FullChunking {
+        static ChunkingStrategy *createLayer(size_t maxLCP, size_t layer) {
+            return new FullChunkingStrategy(maxLCP, 8);
+        }
+    };
+    simpleMmphfBenchmark<ChunkedStringMmphf<FullChunking>>(inputData);
+
+    //struct GreedyChunking {
+    //    static ChunkingStrategy *createLayer(size_t maxLCP, size_t layer) {
+    //        return new GreedyChunkingStrategy(maxLCP, 8);
+    //    }
+    //};
+    //simpleMmphfBenchmark<ChunkedStringMmphf<GreedyChunking>>(inputData); // Very slow
+
+    struct SeparateChunking {
+        static ChunkingStrategy *createLayer(size_t maxLCP, size_t layer) {
+            return new SeparateChunkingStrategy(maxLCP, 8);
+        }
+    };
+    simpleMmphfBenchmark<ChunkedStringMmphf<SeparateChunking>>(inputData);
+
+    struct LayeredChunking {
+        static ChunkingStrategy *createLayer(size_t maxLCP, size_t layer) {
+            if (layer == 0) {
+                return new FullChunkingStrategy(maxLCP, 3);
+            } else {
+                return new FullChunkingStrategy(maxLCP, 8);
+            }
+        }
+    };
+    simpleMmphfBenchmark<ChunkedStringMmphf<LayeredChunking>>(inputData);
+
     return 0;
 }

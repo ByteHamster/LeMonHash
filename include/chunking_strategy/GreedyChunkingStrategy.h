@@ -1,13 +1,14 @@
 #pragma once
 
 #include "chunking_strategy/support/util.h"
+#include "ChunkingStrategy.hpp"
 
 /**
  * Only converts the first 8 bytes to a compressible chunk.
  * All other bytes just stay the same.
  * Idea: Quickly "eat up" common prefixes without having full compression tables.
  */
-struct GreedyChunkingStrategy {
+struct GreedyChunkingStrategy : public ChunkingStrategy {
     using Mmphf = DirectRankStoringMmphf<SuccinctPgmBucketMapper>;
     Mmphf *mmphf = nullptr;
     std::unordered_set<uint64_t> chunks;

@@ -1,12 +1,13 @@
 #pragma once
 
 #include "chunking_strategy/support/util.h"
+#include "ChunkingStrategy.hpp"
 
 /**
  * Converts the entire string to chunks.
  * Chunks of all positions are handled together.
  */
-struct FullChunkingStrategy {
+struct FullChunkingStrategy : public ChunkingStrategy {
     using Mmphf = DirectRankStoringMmphf<SuccinctPgmBucketMapper>;
     Mmphf *mmphf = nullptr;
     size_t maxLCP;
