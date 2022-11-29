@@ -64,9 +64,9 @@ int main(int argc, char** argv) {
     std::cout<<"Generating input data"<<std::endl;
     std::vector<uint64_t> inputData;
     if (type == "pareto") {
-        inputData = randomPareto(1e4, 1);
+        inputData = randomPareto(N, 1);
     } else if (type == "uniform") {
-        inputData = randomUniform(1e6, UINT64_MAX - 1);
+        inputData = randomUniform(N, UINT64_MAX - 1);
     } else {
         cmd.print_usage();
         return 1;
@@ -75,9 +75,9 @@ int main(int argc, char** argv) {
     //doTest<BinarySearchMmphf>(inputData);
     //doTest<DirectRetrievalMmphf>(inputData);
     //dispatchDirectRankStoring<1.0f, 0.01f, 1.2f>(inputData);
-    simpleMmphfBenchmark<DirectRankStoringMmphf<LinearBucketMapper<1.0f>>>(inputData);
-    simpleMmphfBenchmark<DirectRankStoringMmphf<LinearBucketMapper<1.125f>>>(inputData);
-    simpleMmphfBenchmark<DirectRankStoringMmphf<PgmBucketMapper>>(inputData);
+    //simpleMmphfBenchmark<DirectRankStoringMmphf<LinearBucketMapper<1.0f>>>(inputData);
+    //simpleMmphfBenchmark<DirectRankStoringMmphf<LinearBucketMapper<1.125f>>>(inputData);
+    //simpleMmphfBenchmark<DirectRankStoringMmphf<PgmBucketMapper>>(inputData);
     simpleMmphfBenchmark<DirectRankStoringMmphf<SuccinctPgmBucketMapper>>(inputData);
 
     return 0;

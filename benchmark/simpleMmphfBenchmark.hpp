@@ -16,7 +16,8 @@ void simpleMmphfBenchmark(std::vector<key_t> &inputData) {
     std::cout<<"\r\033[K"<<"Verifying "<<MMphf::name()<<std::flush;
     for (size_t i = 0; i < inputData.size(); i++) {
         if (mmphf(inputData.at(i)) != i) {
-            std::cerr<<"Error verifying"<<std::endl;
+            std::cerr<<std::endl<<std::endl<<"Error verifying key "<<i<<std::endl;
+            return;
         }
     }
 
