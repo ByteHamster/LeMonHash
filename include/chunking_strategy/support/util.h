@@ -60,11 +60,13 @@ size_t LCP(std::string &s1, std::string &s2) {
  * By reversing the bytes, this ensures that sorting the integer
  * has the same effect as sorting the string lexicograpically.
  */
-uint64_t readChunk(const char *string, size_t maxLength) {
+uint64_t readChunk(const char *string, size_t maxLength, size_t chunkWidth) {
+    assert(chunkWidth <= 8);
+    assert(chunkWidth >= 1);
     uint64_t chunk = 0;
     char *chunkRaw = (char*) &chunk;
-    for (size_t i = 0; i < 8 && i < maxLength; i++) {
-        chunkRaw[7 - i] = string[i];
+    for (size_t i = 0; i < chunkWidth && i < maxLength; i++) {
+        chunkRaw[chunkWidth - 1 - i] = string[i];
     }
     return chunk;
 }

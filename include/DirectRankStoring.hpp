@@ -77,11 +77,13 @@ class DirectRankStoringMmphf {
             }
         }
 
-        size_t spaceBits() {
-            std::cout<<"EliasFano:    "<<(8.0*bucketSizePrefix.space()/N)<<std::endl;
-            std::cout<<"BucketMapper: "<<(8.0*bucketMapper.size()/N)
-                     <<" ("<<bucketMapper.info()<<")"<<std::endl;
+        size_t spaceBits(bool print = true) {
+            if (print) {
+                std::cout << "EliasFano:    " << (8.0 * bucketSizePrefix.space() / N) << std::endl;
+                std::cout << "BucketMapper: " << (8.0 * bucketMapper.size() / N)
+                          << " (" << bucketMapper.info() << ")" << std::endl;
+            }
             size_t bytes = bucketMapper.size() + sizeof(*this) + bucketSizePrefix.space();
-            return 8 * bytes + retrievalDataStructure.spaceBits(N);
+            return 8 * bytes + retrievalDataStructure.spaceBits(0);
         }
 };

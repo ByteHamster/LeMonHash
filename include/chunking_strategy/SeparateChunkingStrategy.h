@@ -9,6 +9,7 @@
 struct SeparateChunkingStrategy {
     using Mmphf = DirectRankStoringMmphf<SuccinctPgmBucketMapper>;
     size_t maxLCP;
+    size_t chunkWidth;
     std::vector<Mmphf *> mmphfs;
     std::vector<std::unordered_set<uint64_t>> chunks;
 
@@ -16,15 +17,16 @@ struct SeparateChunkingStrategy {
         return "SeparateChunkingStrategy";
     }
 
-    explicit SeparateChunkingStrategy(size_t maxLCP)
-            : maxLCP(maxLCP) {
-        mmphfs.resize(maxLCP / 8 + 1, nullptr);
-        chunks.resize(maxLCP / 8 + 1);
+    explicit SeparateChunkingStrategy(size_t maxLCP, size_t chunkWidth)
+            : maxLCP(maxLCP), chunkWidth(chunkWidth) {
+        mmphfs.resize(maxLCP / chunkWidth + 1, nullptr);
+        chunks.resize(maxLCP / chunkWidth + 1);
     }
 
     SeparateChunkingStrategy(SeparateChunkingStrategy && rhs) noexcept {
         maxLCP = rhs.maxLCP;
         mmphfs = rhs.mmphfs;
+        chunkWidth = rhs.chunkWidth;
         rhs.mmphfs.clear();
     }
 
@@ -37,8 +39,8 @@ struct SeparateChunkingStrategy {
     void extractChunks(std::string &string) {
         const char *str = string.c_str();
         size_t length = std::min(maxLCP + 1, string.length());
-        for (size_t i = 0; i < length; i += 8) {
-            chunks.at(i / 8ul).insert(readChunk(str + i, length - i));
+        for (size_t i = 0; i < length; i += chunkWidth) {
+            chunks.at(i / chunkWidth).insert(readChunk(str + i, length - i, chunkWidth));
         }
     }
 
@@ -61,9 +63,9 @@ struct SeparateChunkingStrategy {
         StringBuilder builder;
         const char *str = string.c_str();
         size_t length = std::min(maxLCP + 1, string.length());
-        for (size_t i = 0; i < length; i += 8) {
-            size_t chunkIndex = mmphfs.at(i / 8ul)->operator()(readChunk(str + i, length - i));
-            builder.appendInt(chunkIndex + 1, BITS_NEEDED(mmphfs.at(i / 8ul)->N + 1));
+        for (size_t i = 0; i < length; i += chunkWidth) {
+            size_t chunkIndex = mmphfs.at(i / chunkWidth)->operator()(readChunk(str + i, length - i, chunkWidth));
+            builder.appendInt(chunkIndex + 1, BITS_NEEDED(mmphfs.at(i / chunkWidth)->N + 1));
         }
         return builder.toString();
     }
@@ -74,7 +76,7 @@ struct SeparateChunkingStrategy {
             if (mmphfs.at(i) == nullptr) {
                 continue;
             }
-            size += mmphfs.at(i)->spaceBits();
+            size += mmphfs.at(i)->spaceBits(false);
         }
         return size;
     }

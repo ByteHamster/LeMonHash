@@ -26,8 +26,9 @@ class ChunkedStringMmphf {
             }
 
             while (maxLCP >= 8) {
-                std::cout<<"Generating chunking layer "<<(chunkingLayers.size()+1)<<std::endl;
-                chunkingLayers.emplace_back(maxLCP);
+                size_t layer = chunkingLayers.size();
+                std::cout<<"Generating chunking layer "<<layer<<std::endl;
+                chunkingLayers.emplace_back(maxLCP, layer == 0 ? 3 : 8);
                 ChunkingStrategy &chunkingLayer = chunkingLayers.back();
                 for (std::string &string: strings) {
                     chunkingLayer.extractChunks(string);
@@ -49,7 +50,7 @@ class ChunkedStringMmphf {
             std::cout<<"Generating last level MMPHF"<<std::endl;
             std::vector<uint64_t> sortedChunks;
             for (size_t i = 0; i < strings.size(); i++) {
-                sortedChunks.push_back(readChunk(strings.at(i).c_str(), strings.at(i).length()));
+                sortedChunks.push_back(readChunk(strings.at(i).c_str(), strings.at(i).length(), 8));
                 assert((i == 0 || sortedChunks.at(i - 1) < sortedChunks.at(i)) && "All last-level strings must be unique and sorted");
             }
             mmphf = new Mmphf(sortedChunks);
@@ -66,15 +67,13 @@ class ChunkedStringMmphf {
         size_t spaceBits() {
             size_t bits = 8 * sizeof(*this);
             for (size_t i = 0; i < chunkingLayers.size(); i++) {
-                std::cout<<"--------------- Chunking layer "<<i<<": ---------------"<<std::endl;
                 size_t layerBits = chunkingLayers.at(i).spaceBits();
                 bits += layerBits;
-                std::cout<<"Layer total: "<<(1.0*layerBits/N)<<std::endl;
+                std::cout<<"Layer "<<i<<" total space: "<<(1.0*layerBits/N)<<std::endl;
             }
-            std::cout<<"--------------- Final layer: ---------------"<<std::endl;
-            size_t layerBits = mmphf->spaceBits();
+            size_t layerBits = mmphf->spaceBits(false);
             bits += layerBits;
-            std::cout<<"Layer total: "<<(1.0*layerBits/N)<<std::endl;
+            std::cout<<"Final layer total space: "<<(1.0*layerBits/N)<<std::endl;
             return bits;
         }
 
@@ -82,6 +81,6 @@ class ChunkedStringMmphf {
             for (ChunkingStrategy &layer : chunkingLayers) {
                 string = layer.compress(string);
             }
-            return mmphf->operator()(readChunk(string.c_str(), string.length()));
+            return mmphf->operator()(readChunk(string.c_str(), string.length(), 8));
         }
 };
