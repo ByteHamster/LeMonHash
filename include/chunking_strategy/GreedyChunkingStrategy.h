@@ -12,18 +12,17 @@ struct GreedyChunkingStrategy : public ChunkingStrategy {
     using Mmphf = DirectRankStoringMmphf<SuccinctPgmBucketMapper>;
     Mmphf *mmphf = nullptr;
     std::unordered_set<uint64_t> chunks;
-    size_t maxLCP;
-    size_t chunkWidth;
 
-    static std::string name() {
+    std::string name() {
         return "GreedyChunkingStrategy";
     }
 
     explicit GreedyChunkingStrategy(size_t maxLCP, size_t chunkWidth)
-            : maxLCP(maxLCP), chunkWidth(chunkWidth) {
+            : ChunkingStrategy(maxLCP, chunkWidth) {
     }
 
-    GreedyChunkingStrategy(GreedyChunkingStrategy && rhs) noexcept {
+    GreedyChunkingStrategy(GreedyChunkingStrategy && rhs) noexcept
+            : ChunkingStrategy(rhs.maxLCP, rhs.chunkWidth) {
         maxLCP = rhs.maxLCP;
         mmphf = rhs.mmphf;
         chunkWidth = rhs.chunkWidth;

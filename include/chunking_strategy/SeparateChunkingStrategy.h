@@ -9,22 +9,21 @@
  */
 struct SeparateChunkingStrategy : public ChunkingStrategy {
     using Mmphf = DirectRankStoringMmphf<SuccinctPgmBucketMapper>;
-    size_t maxLCP;
-    size_t chunkWidth;
     std::vector<Mmphf *> mmphfs;
     std::vector<std::unordered_set<uint64_t>> chunks;
 
-    static std::string name() {
+    std::string name() {
         return "SeparateChunkingStrategy";
     }
 
     explicit SeparateChunkingStrategy(size_t maxLCP, size_t chunkWidth)
-            : maxLCP(maxLCP), chunkWidth(chunkWidth) {
+            : ChunkingStrategy(maxLCP, chunkWidth) {
         mmphfs.resize(maxLCP / chunkWidth + 1, nullptr);
         chunks.resize(maxLCP / chunkWidth + 1);
     }
 
-    SeparateChunkingStrategy(SeparateChunkingStrategy && rhs) noexcept {
+    SeparateChunkingStrategy(SeparateChunkingStrategy && rhs) noexcept
+            : ChunkingStrategy(rhs.maxLCP, rhs.chunkWidth) {
         maxLCP = rhs.maxLCP;
         mmphfs = rhs.mmphfs;
         chunkWidth = rhs.chunkWidth;
@@ -47,7 +46,7 @@ struct SeparateChunkingStrategy : public ChunkingStrategy {
 
     void build() {
         for (size_t i = 0; i < chunks.size(); i++) {
-            if (chunks.at(i).empty()) {
+            if (chunks.at(i).size() <= 1) {
                 continue;
             }
             std::vector<uint64_t> sortedChunks;
@@ -65,7 +64,11 @@ struct SeparateChunkingStrategy : public ChunkingStrategy {
         const char *str = string.c_str();
         size_t length = std::min(maxLCP + 1, string.length());
         for (size_t i = 0; i < length; i += chunkWidth) {
-            size_t chunkIndex = mmphfs.at(i / chunkWidth)->operator()(readChunk(str + i, length - i, chunkWidth));
+            Mmphf *mmphf = mmphfs.at(i / chunkWidth);
+            if (mmphf == nullptr) {
+                continue; // All chunks the same
+            }
+            size_t chunkIndex = mmphf->operator()(readChunk(str + i, length - i, chunkWidth));
             builder.appendInt(chunkIndex + 1, BITS_NEEDED(mmphfs.at(i / chunkWidth)->N + 1));
         }
         return builder.toString();

@@ -7,6 +7,7 @@
 #include "chunking_strategy/FullChunkingStrategy.h"
 #include "chunking_strategy/GreedyChunkingStrategy.h"
 #include "chunking_strategy/SeparateChunkingStrategy.h"
+#include "chunking_strategy/BackChunkingStrategy.h"
 
 template <typename ChunkingLayerStrategy>
 class ChunkedStringMmphf {
@@ -27,9 +28,9 @@ class ChunkedStringMmphf {
 
             while (maxLCP >= 8) {
                 size_t layer = chunkingLayers.size();
-                std::cout<<"Generating chunking layer "<<layer<<std::endl;
                 chunkingLayers.push_back(ChunkingLayerStrategy::createLayer(maxLCP, layer));
                 ChunkingStrategy &chunkingLayer = *chunkingLayers.back();
+                std::cout<<"Generating chunking layer "<<layer<<" (max LCP: "<<maxLCP<<") with "<<chunkingLayer.name()<<std::endl;
                 for (std::string &string: strings) {
                     chunkingLayer.extractChunks(string);
                 }
@@ -69,7 +70,12 @@ class ChunkedStringMmphf {
             for (size_t i = 0; i < chunkingLayers.size(); i++) {
                 size_t layerBits = chunkingLayers.at(i)->spaceBits();
                 bits += layerBits;
-                std::cout<<"Layer "<<i<<" total space: "<<(1.0*layerBits/N)<<std::endl;
+                std::cout<<"Layer "<<i<<" total space: "<<(1.0*layerBits/N);
+                if (i < chunkingLayers.size() - 1) {
+                    std::cout<<", maxLCP reduction: -"
+                        <<std::round(100.0f - 100.0f * chunkingLayers.at(i+1)->maxLCP / chunkingLayers.at(i)->maxLCP)<<"%";
+                }
+                std::cout<<std::endl;
             }
             size_t layerBits = mmphf->spaceBits(false);
             bits += layerBits;

@@ -4,23 +4,22 @@
 #include "ChunkingStrategy.hpp"
 
 /**
- * Converts the entire string to chunks.
- * Chunks of all positions are handled together.
+ * Keeps short strings as they are but compresses the back of long strings.
  */
-struct FullChunkingStrategy : public ChunkingStrategy {
+struct BackChunkingStrategy : public ChunkingStrategy {
     using Mmphf = DirectRankStoringMmphf<SuccinctPgmBucketMapper>;
     Mmphf *mmphf = nullptr;
     std::unordered_set<uint64_t> chunks;
 
     std::string name() {
-        return "FullChunkingStrategy";
+        return "BackChunkingStrategy";
     }
 
-    FullChunkingStrategy(size_t maxLCP, size_t chunkWidth)
+    BackChunkingStrategy(size_t maxLCP, size_t chunkWidth)
             : ChunkingStrategy(maxLCP, chunkWidth) {
     }
 
-    FullChunkingStrategy(FullChunkingStrategy && rhs) noexcept
+    BackChunkingStrategy(size_t maxLcp, size_t chunkWidth, BackChunkingStrategy &&rhs) noexcept
             : ChunkingStrategy(rhs.maxLCP, rhs.chunkWidth) {
         maxLCP = rhs.maxLCP;
         mmphf = rhs.mmphf;
@@ -28,14 +27,14 @@ struct FullChunkingStrategy : public ChunkingStrategy {
         rhs.mmphf = nullptr;
     }
 
-    ~FullChunkingStrategy() {
+    ~BackChunkingStrategy() {
         delete mmphf;
     }
 
     void extractChunks(std::string &string) {
         const char *str = string.c_str();
         size_t length = std::min(maxLCP + 1, string.length());
-        for (size_t i = 0; i < length; i += chunkWidth) {
+        for (size_t i = maxLCP/2; i < length; i += chunkWidth) {
             chunks.insert(readChunk(str + i, length - i, chunkWidth));
         }
     }
@@ -55,11 +54,11 @@ struct FullChunkingStrategy : public ChunkingStrategy {
         StringBuilder builder;
         const char *str = string.c_str();
         size_t length = std::min(maxLCP + 1, string.length());
-        for (size_t i = 0; i < length; i += chunkWidth) {
+        for (size_t i = maxLCP/2; i < length; i += chunkWidth) {
             size_t chunkIndex = mmphf->operator()(readChunk(str + i, length - i, chunkWidth));
             builder.appendInt(chunkIndex + 1, BITS_NEEDED(mmphf->N + 1));
         }
-        return builder.toString();
+        return string.substr(0, std::min(maxLCP/2, length)) + builder.toString();
     }
 
     size_t spaceBits() {

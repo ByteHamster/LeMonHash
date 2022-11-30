@@ -114,7 +114,7 @@ int main(int argc, char** argv) {
             if (layer == 0) {
                 return new FullChunkingStrategy(maxLCP, 3); // Alphabet reduction
             } else if (layer == 1) {
-                return new SeparateChunkingStrategy(maxLCP, 8); // Use similarity of first chunks
+                return new BackChunkingStrategy(maxLCP, 8); // Make long strings shorter
             } else {
                 return new FullChunkingStrategy(maxLCP, 8);
             }
