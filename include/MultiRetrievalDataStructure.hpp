@@ -1,6 +1,7 @@
 #pragma once
 
 #include <SimpleRibbon.h>
+#include "chunking_strategy/support/util.h"
 
 /**
  * Container with multiple retrieval data structures of different sizes.
@@ -27,7 +28,9 @@ class MultiRetrievalDataStructure {
         std::vector<std::pair<uint64_t, uint8_t>> retrieval7Input;
         std::vector<std::pair<uint64_t, uint32_t>> retrieval8PlusInput;
     public:
+        size_t spaceTheory = 0;
         void addInput(size_t range, uint64_t key, uint32_t value) {
+            spaceTheory += BITS_NEEDED(range);
             if (range <= 2) {
                 retrieval1Input.emplace_back(std::make_pair(key, value));
             } else if (range <= 4) {

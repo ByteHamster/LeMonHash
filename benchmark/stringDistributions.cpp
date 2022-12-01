@@ -5,6 +5,7 @@
 #include <XorShift64.h>
 #include "ChunkedStringMmphf.hpp"
 #include "simpleMmphfBenchmark.hpp"
+#include "RecursiveDirectRankStoring.hpp"
 
 std::string stringOfLength(size_t length, util::XorShift64 &prng) {
     std::string key(length, 'x');
@@ -121,6 +122,8 @@ int main(int argc, char** argv) {
         }
     };
     simpleMmphfBenchmark<ChunkedStringMmphf<LayeredChunkingForUrls>>(inputData);
+
+    simpleMmphfBenchmark<RecursiveDirectRankStoringMmphf>(inputData);
 
     return 0;
 }
