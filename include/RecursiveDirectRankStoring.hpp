@@ -95,9 +95,11 @@ class RecursiveDirectRankStoringMmphf {
                     recurseBucket[i] = false;
 
                     // Perform direct rank storing
-                    for (size_t k = 0; k < buckets.at(i).size(); k++) {
-                        std::string prefixedKey = std::to_string(retrievalPrefix) + buckets.at(i).at(k);
-                        retrieval->addInput(buckets.at(i).size(), util::MurmurHash64(prefixedKey), k);
+                    if (buckets.at(i).size() > 1) {
+                        for (size_t k = 0; k < buckets.at(i).size(); k++) {
+                            std::string prefixedKey = std::to_string(retrievalPrefix) + buckets.at(i).at(k);
+                            retrieval->addInput(buckets.at(i).size(), util::MurmurHash64(prefixedKey), k);
+                        }
                     }
                 } else {
                     recurseBucket[i] = true;
@@ -127,7 +129,7 @@ class RecursiveDirectRankStoringMmphf {
 
         size_t spaceBits() {
             size_t bits = 8 * bucketMapper->size()
-                    + (createdRibbon ? retrieval->spaceTheory : 0)
+                    + (createdRibbon ? retrieval->spaceBits() : 0)
                     + 8 * bucketSizePrefix->space()
                     + 8 * sizeof(*this)
                     + recurseBucket.size() + 8 * recurseBucketRank->space_usage()
@@ -153,8 +155,12 @@ class RecursiveDirectRankStoringMmphf {
                 ++bucketOffsetPtr;
                 size_t nextBucketOffset = *bucketOffsetPtr;
                 size_t bucketSize = nextBucketOffset - bucketOffset;
-                std::string prefixedKey = std::to_string(retrievalPrefix) + string;
-                return bucketOffset + retrieval->query(bucketSize, util::MurmurHash64(prefixedKey));
+                if (bucketSize == 1) {
+                    return bucketOffset;
+                } else {
+                    std::string prefixedKey = std::to_string(retrievalPrefix) + string;
+                    return bucketOffset + retrieval->query(bucketSize, util::MurmurHash64(prefixedKey));
+                }
             }
         }
 };
