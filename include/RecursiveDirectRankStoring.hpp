@@ -24,11 +24,16 @@
 class RecursiveDirectRankStoringMmphf {
     private:
         static constexpr size_t DIRECT_RANK_STORING_THRESHOLD = 4096;
+        // We use the same retrieval data structure for all children,
+        // so we need to prefix strings with something unique in each layer.
+        static uint32_t retrievalPrefixCounter;
 
         // As in normal DirectRankStoring:
         SuccinctPgmBucketMapper *bucketMapper = nullptr;
         util::EliasFanoM *bucketSizePrefix = nullptr;
-        MultiRetrievalDataStructure retrieval;
+        MultiRetrievalDataStructure *retrieval;
+        uint32_t retrievalPrefix;
+        bool createdRibbon = false;
 
         // If a bucket is very full, recurse
         pasta::BitVector recurseBucket;
@@ -38,7 +43,16 @@ class RecursiveDirectRankStoringMmphf {
         // Cut off characters that are the same in all input strings. Useful especially for recursion.
         size_t minLCP = 9999999;
     public:
-        explicit RecursiveDirectRankStoringMmphf(std::vector<std::string> strings) {
+        explicit RecursiveDirectRankStoringMmphf(std::vector<std::string> strings,
+                                                 MultiRetrievalDataStructure *retrieval_ = nullptr) {
+            retrieval = retrieval_;
+            if (retrieval == nullptr) {
+                retrieval = new MultiRetrievalDataStructure;
+                createdRibbon = true;
+            }
+            retrievalPrefix = retrievalPrefixCounter++;
+            assert(retrievalPrefixCounter < 9999);
+
             std::unordered_set<uint64_t> chunks;
             for (size_t i = 0; i < strings.size(); i++) {
                 if (i > 0) {
@@ -82,17 +96,20 @@ class RecursiveDirectRankStoringMmphf {
 
                     // Perform direct rank storing
                     for (size_t k = 0; k < buckets.at(i).size(); k++) {
-                        retrieval.addInput(buckets.at(i).size(), util::MurmurHash64(buckets.at(i).at(k)), k);
+                        std::string prefixedKey = std::to_string(retrievalPrefix) + buckets.at(i).at(k);
+                        retrieval->addInput(buckets.at(i).size(), util::MurmurHash64(prefixedKey), k);
                     }
                 } else {
                     recurseBucket[i] = true;
-                    children.push_back(new RecursiveDirectRankStoringMmphf(buckets.at(i)));
+                    children.push_back(new RecursiveDirectRankStoringMmphf(buckets.at(i), retrieval));
                 }
             }
             bucketSizePrefix->push_back(bucketSizePrefixTemp);
             bucketSizePrefix->buildRankSelect();
             recurseBucketRank = new pasta::FlatRankSelect<pasta::OptimizedFor::ZERO_QUERIES>(recurseBucket);
-            retrieval.build();
+            if (createdRibbon) {
+                retrieval->build();
+            }
         }
 
         ~RecursiveDirectRankStoringMmphf() {
@@ -110,7 +127,7 @@ class RecursiveDirectRankStoringMmphf {
 
         size_t spaceBits() {
             size_t bits = 8 * bucketMapper->size()
-                    + retrieval.spaceTheory
+                    + (createdRibbon ? retrieval->spaceTheory : 0)
                     + 8 * bucketSizePrefix->space()
                     + 8 * sizeof(*this)
                     + recurseBucket.size() + 8 * recurseBucketRank->space_usage()
@@ -136,7 +153,9 @@ class RecursiveDirectRankStoringMmphf {
                 ++bucketOffsetPtr;
                 size_t nextBucketOffset = *bucketOffsetPtr;
                 size_t bucketSize = nextBucketOffset - bucketOffset;
-                return bucketOffset + retrieval.query(bucketSize, util::MurmurHash64(string));
+                std::string prefixedKey = std::to_string(retrievalPrefix) + string;
+                return bucketOffset + retrieval->query(bucketSize, util::MurmurHash64(prefixedKey));
             }
         }
 };
+uint32_t RecursiveDirectRankStoringMmphf::retrievalPrefixCounter = 1000;
