@@ -31,9 +31,9 @@ class RecursiveDirectRankStoringMmphf {
         // As in normal DirectRankStoring:
         SuccinctPgmBucketMapper *bucketMapper = nullptr;
         util::EliasFanoM *bucketSizePrefix = nullptr;
-        MultiRetrievalDataStructure *retrieval;
+        MultiRetrievalDataStructure * const retrieval;
         uint32_t retrievalPrefix;
-        bool isRibbonOwner = false;
+        const bool isTopLevel;
 
         // If a bucket is very full, recurse
         util::EliasFanoM *recurseBucket = nullptr;
@@ -42,13 +42,13 @@ class RecursiveDirectRankStoringMmphf {
         // Cut off characters that are the same in all input strings. Useful especially for recursion.
         size_t minLCP = 9999999;
     public:
-        explicit RecursiveDirectRankStoringMmphf(std::vector<std::string> strings,
-                                                 MultiRetrievalDataStructure *retrieval_ = nullptr) {
-            retrieval = retrieval_;
-            if (retrieval == nullptr) {
-                retrieval = new MultiRetrievalDataStructure;
-                isRibbonOwner = true;
-            }
+        explicit RecursiveDirectRankStoringMmphf(std::vector<std::string> &strings)
+            : RecursiveDirectRankStoringMmphf(strings, new MultiRetrievalDataStructure, true) {
+        }
+    private:
+        RecursiveDirectRankStoringMmphf(std::vector<std::string> strings,
+                                        MultiRetrievalDataStructure *retrieval_, bool isTopLevel_ = false)
+                 : retrieval(retrieval_), isTopLevel(isTopLevel_) {
             retrievalPrefix = retrievalPrefixCounter++;
             assert(retrievalPrefixCounter < 99999); // All counters need to have the same number of digits
 
@@ -112,11 +112,12 @@ class RecursiveDirectRankStoringMmphf {
                 }
                 recurseBucket->buildRankSelect();
             }
-            if (isRibbonOwner) {
+            if (isTopLevel) {
                 retrieval->build();
             }
         }
 
+    public:
         ~RecursiveDirectRankStoringMmphf() {
             delete bucketMapper;
             delete bucketSizePrefix;
@@ -131,16 +132,30 @@ class RecursiveDirectRankStoringMmphf {
         }
 
         size_t spaceBits() {
-            size_t bits = 8 * bucketMapper->size()
-                    + (isRibbonOwner ? retrieval->spaceBits() : 0)
-                    + 8 * bucketSizePrefix->space()
-                    + 8 * sizeof(*this)
-                    + 8 * (recurseBucket == nullptr ? 0 : recurseBucket->space())
-                    + 8 * children.size() * sizeof(uint64_t);
+            assert(isTopLevel);
+            std::cout<<"Retrieval:          "<<1.0*retrieval->spaceBits()/1000000<<std::endl;
+            std::cout<<"Bucket size prefix: "<<8.0*visit([] (auto &obj) { return obj.bucketSizePrefix->size(); })/1000000<<std::endl;
+            std::cout<<"PGM:                "<<8.0*visit([] (auto &obj) { return obj.bucketMapper->size(); })/1000000<<std::endl;
+            std::cout<<"Recursion pointers: "<<8.0*visit([] (auto &obj) { return (obj.recurseBucket == nullptr ? 0 : obj.recurseBucket->space())
+                                                                        + obj.children.size() * sizeof(uint64_t); })/1000000<<std::endl;
+            std::cout<<"sizeof(*this):      "<<8.0*visit([] (auto &obj) { return sizeof(obj); })/1000000<<std::endl;
+
+            return retrieval->spaceBits() + 8 * visit([] (RecursiveDirectRankStoringMmphf &obj) {
+                return obj.bucketMapper->size()
+                     + obj.bucketSizePrefix->space()
+                     + sizeof(obj)
+                     + (obj.recurseBucket == nullptr ? 0 : obj.recurseBucket->space())
+                     + obj.children.size() * sizeof(uint64_t);
+                });
+        }
+
+        template <typename T>
+        size_t visit(T visitor) {
+            size_t sum = visitor(*this);
             for (auto *child : children) {
-                bits += child->spaceBits();
+                sum += child->visit(visitor);
             }
-            return bits;
+            return sum;
         }
 
         uint64_t operator ()(std::string string) {
