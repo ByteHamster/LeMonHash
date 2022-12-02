@@ -43,70 +43,76 @@ class RecursiveDirectRankStoringMmphf {
         size_t minLCP = 9999999;
     public:
         explicit RecursiveDirectRankStoringMmphf(std::vector<std::string> &strings)
-            : RecursiveDirectRankStoringMmphf(strings, new MultiRetrievalDataStructure, true) {
+            : RecursiveDirectRankStoringMmphf(strings.begin(), strings.end(), new MultiRetrievalDataStructure, true) {
         }
     private:
-        RecursiveDirectRankStoringMmphf(std::vector<std::string> strings,
+        RecursiveDirectRankStoringMmphf(auto begin, auto end,
                                         MultiRetrievalDataStructure *retrieval_, bool isTopLevel_ = false)
                  : retrieval(retrieval_), isTopLevel(isTopLevel_) {
             retrievalPrefix = retrievalPrefixCounter++;
             assert(retrievalPrefixCounter < 99999); // All counters need to have the same number of digits
 
-            for (size_t i = 0; i < strings.size(); i++) {
-                if (i > 0) {
-                    minLCP = std::min(minLCP, LCP(strings.at(i), strings.at(i-1)));
-                }
+            auto it = begin + 1;
+            while (it != end) {
+                minLCP = std::min(minLCP, LCP(*it, *std::prev(it)));
+                it++;
             }
 
             // Trim strings and extract chunks
             std::vector<uint64_t> chunks;
             uint64_t previousChunk = 0;
-            for (auto & string : strings) {
-                string = string.substr(minLCP);
-                uint64_t chunk = readChunk(string.c_str(), string.length(), 8);
+            it = begin;
+            while (it != end) {
+                uint64_t chunk = readChunk((*it).c_str() + minLCP, (*it).length() - minLCP, 8);
                 assert(chunk >= previousChunk);
                 if (chunk != previousChunk || chunks.empty()) {
                     chunks.push_back(chunk);
                     previousChunk = chunk;
                 }
+                it++;
             }
             assert(chunks.size() >= 2); // If all were the same, we would have not cut off enough
             bucketMapper = new SuccinctPgmBucketMapper(chunks.begin(), chunks.end());
 
-            std::vector<std::string> currentBucket;
+            it = begin;
+            auto currentBucketBegin = begin;
             size_t prev_bucket = 0;
             size_t bucketSizePrefixTemp = 0;
-            bucketSizePrefix = new util::EliasFanoM(bucketMapper->numBuckets + 1, strings.size() + 1);
+            bucketSizePrefix = new util::EliasFanoM(bucketMapper->numBuckets + 1, std::distance(begin, end) + 1);
             std::vector<size_t> recursingBucketsInput;
 
             auto constructBucket = [&] {
-                if (currentBucket.size() <= 1) {
+                size_t currentBucketSize = std::distance(currentBucketBegin, it);
+                if (currentBucketSize <= 1) {
                     // Nothing to do
-                } else if (currentBucket.size() < DIRECT_RANK_STORING_THRESHOLD) {
+                } else if (currentBucketSize < DIRECT_RANK_STORING_THRESHOLD) {
                     // Perform direct rank storing
-                    for (size_t k = 0; k < currentBucket.size(); k++) {
-                        std::string prefixedKey = std::to_string(retrievalPrefix) + currentBucket.at(k);
-                        retrieval->addInput(currentBucket.size(), util::MurmurHash64(prefixedKey), k);
+                    size_t indexInBucket = 0;
+                    while (currentBucketBegin != it) {
+                        std::string prefixedKey = std::to_string(retrievalPrefix) + *currentBucketBegin;
+                        retrieval->addInput(currentBucketSize, util::MurmurHash64(prefixedKey), indexInBucket);
+                        currentBucketBegin++;
+                        indexInBucket++;
                     }
                 } else {
                     // Recurse
                     recursingBucketsInput.push_back(prev_bucket);
-                    children.push_back(new RecursiveDirectRankStoringMmphf(currentBucket, retrieval));
+                    children.push_back(new RecursiveDirectRankStoringMmphf(currentBucketBegin, it, retrieval));
                 }
 
                 bucketSizePrefix->push_back(bucketSizePrefixTemp);
-                bucketSizePrefixTemp += currentBucket.size();
-                currentBucket.clear();
+                currentBucketBegin = it;
+                bucketSizePrefixTemp += currentBucketSize;
             };
             // This loop should be replaced with a variant of SuccinctPGM::for_each
-            for (std::string &string : strings) {
-                uint64_t chunk = readChunk(string.c_str(), string.length(), 8);
+            while (it != end) {
+                uint64_t chunk = readChunk((*it).c_str() + minLCP, (*it).length() - minLCP, 8);
                 size_t bucket = bucketMapper->bucketOf(chunk);
                 while (bucket != prev_bucket) {
                     constructBucket();
                     prev_bucket++;
                 }
-                currentBucket.push_back(string);
+                it++;
             }
             while (prev_bucket < bucketMapper->numBuckets + 1) {
                 constructBucket();
@@ -168,9 +174,8 @@ class RecursiveDirectRankStoringMmphf {
             return sum;
         }
 
-        uint64_t operator ()(std::string string) {
-            string = string.substr(minLCP);
-            uint64_t chunk = readChunk(string.c_str(), string.length(), 8);
+        uint64_t operator ()(std::string &string) {
+            uint64_t chunk = readChunk(string.c_str() + minLCP, string.length() - minLCP, 8);
             size_t bucket = bucketMapper->bucketOf(chunk);
             auto bucketOffsetPtr = bucketSizePrefix->at(bucket);
             size_t bucketOffset = *bucketOffsetPtr;
