@@ -24,15 +24,12 @@
 class RecursiveDirectRankStoringMmphf {
     private:
         static constexpr size_t DIRECT_RANK_STORING_THRESHOLD = 4096;
-        // We use the same retrieval data structure for all children,
-        // so we need to prefix strings with something unique in each layer.
-        static uint32_t retrievalPrefixCounter;
 
         // As in normal DirectRankStoring:
         SuccinctPgmBucketMapper *bucketMapper = nullptr;
         util::EliasFanoM *bucketSizePrefix = nullptr;
         MultiRetrievalDataStructure * const retrieval;
-        uint32_t retrievalPrefix;
+        uint32_t retrievalSeed; // Common retrieval data structure for all layers ==> each layer needs a unique seed
         const bool isTopLevel;
 
         // If a bucket is very full, recurse
@@ -49,8 +46,8 @@ class RecursiveDirectRankStoringMmphf {
         RecursiveDirectRankStoringMmphf(auto begin, auto end,
                                         MultiRetrievalDataStructure *retrieval_, bool isTopLevel_ = false)
                  : retrieval(retrieval_), isTopLevel(isTopLevel_) {
-            retrievalPrefix = retrievalPrefixCounter++;
-            assert(retrievalPrefixCounter < 99999); // All counters need to have the same number of digits
+            static uint32_t nextRetrievalSeed = 0;
+            retrievalSeed = nextRetrievalSeed++;
 
             auto it = begin + 1;
             while (it != end) {
@@ -87,10 +84,10 @@ class RecursiveDirectRankStoringMmphf {
                     // Nothing to do
                 } else if (currentBucketSize < DIRECT_RANK_STORING_THRESHOLD) {
                     // Perform direct rank storing
-                    size_t indexInBucket = 0;
+                    uint32_t indexInBucket = 0;
                     while (currentBucketBegin != it) {
-                        std::string prefixedKey = std::to_string(retrievalPrefix) + *currentBucketBegin;
-                        retrieval->addInput(currentBucketSize, util::MurmurHash64(prefixedKey), indexInBucket);
+                        retrieval->addInput(currentBucketSize,
+                                    util::remix(util::MurmurHash64(*currentBucketBegin) + retrievalSeed), indexInBucket);
                         currentBucketBegin++;
                         indexInBucket++;
                     }
@@ -175,6 +172,11 @@ class RecursiveDirectRankStoringMmphf {
         }
 
         uint64_t operator ()(std::string &string) {
+            return operator()(string, util::MurmurHash64(string));
+        }
+
+    private:
+        uint64_t operator ()(std::string &string, uint64_t stringHash) {
             uint64_t chunk = readChunk(string.c_str() + minLCP, string.length() - minLCP, 8);
             size_t bucket = bucketMapper->bucketOf(chunk);
             auto bucketOffsetPtr = bucketSizePrefix->at(bucket);
@@ -188,13 +190,11 @@ class RecursiveDirectRankStoringMmphf {
                 if (bucketSize == 1) {
                     return bucketOffset;
                 } else {
-                    std::string prefixedKey = std::to_string(retrievalPrefix) + string;
-                    return bucketOffset + retrieval->query(bucketSize, util::MurmurHash64(prefixedKey));
+                    return bucketOffset + retrieval->query(bucketSize, util::remix(stringHash + retrievalSeed));
                 }
             } else {
                 size_t childPos = recursingBuckets->predecessorPosition(bucket).index(); // Rank query
-                return bucketOffset + children.at(childPos)->operator()(string);
+                return bucketOffset + children.at(childPos)->operator()(string, stringHash);
             }
         }
 };
-uint32_t RecursiveDirectRankStoringMmphf::retrievalPrefixCounter = 10000;
