@@ -131,14 +131,16 @@ class RecursiveDirectRankStoringMmphf {
             return "RecursiveDirectRankStoringMmphf";
         }
 
-        size_t spaceBits() {
+        size_t spaceBits(size_t N = 0) {
             assert(isTopLevel);
-            std::cout<<"Retrieval:          "<<1.0*retrieval->spaceBits()/1000000<<std::endl;
-            std::cout<<"Bucket size prefix: "<<8.0*visit([] (auto &obj) { return obj.bucketSizePrefix->size(); })/1000000<<std::endl;
-            std::cout<<"PGM:                "<<8.0*visit([] (auto &obj) { return obj.bucketMapper->size(); })/1000000<<std::endl;
-            std::cout<<"Recursion pointers: "<<8.0*visit([] (auto &obj) { return (obj.recurseBucket == nullptr ? 0 : obj.recurseBucket->space())
-                                                                        + obj.children.size() * sizeof(uint64_t); })/1000000<<std::endl;
-            std::cout<<"sizeof(*this):      "<<8.0*visit([] (auto &obj) { return sizeof(obj); })/1000000<<std::endl;
+            if (N != 0) {
+                std::cout<<"Retrieval:          "<<1.0*retrieval->spaceBits()/N<<std::endl;
+                std::cout<<"Bucket size prefix: "<<8.0*visit([] (auto &obj) { return obj.bucketSizePrefix->size(); })/N<<std::endl;
+                std::cout<<"PGM:                "<<8.0*visit([] (auto &obj) { return obj.bucketMapper->size(); })/N<<std::endl;
+                std::cout<<"Recursion pointers: "<<8.0*visit([] (auto &obj) { return (obj.recurseBucket == nullptr ? 0 : obj.recurseBucket->space())
+                                                                            + obj.children.size() * sizeof(uint64_t); })/N<<std::endl;
+                std::cout<<"sizeof(*this):      "<<8.0*visit([] (auto &obj) { return sizeof(obj); })/N<<std::endl;
+            }
 
             return retrieval->spaceBits() + 8 * visit([] (RecursiveDirectRankStoringMmphf &obj) {
                 return obj.bucketMapper->size()
