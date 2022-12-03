@@ -63,6 +63,8 @@ size_t LCP(std::string &s1, std::string &s2) {
 uint64_t readChunk(const char *string, size_t maxLength, size_t chunkWidth) {
     assert(chunkWidth <= 8);
     assert(chunkWidth >= 1);
+    if (chunkWidth == 8 && maxLength >= 8)
+        return __builtin_bswap64(*((uint64_t*) string));
     uint64_t chunk = 0;
     char *chunkRaw = (char*) &chunk;
     for (size_t i = 0; i < chunkWidth && i < maxLength; i++) {
