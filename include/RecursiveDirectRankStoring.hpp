@@ -112,16 +112,16 @@ class RecursiveDirectRankStoringMmphf {
                 currentBucketBegin = it;
                 bucketSizePrefixTemp += currentBucketSize;
             };
-            // This loop should be replaced with a variant of SuccinctPGM::for_each
-            while (it != end) {
-                uint64_t chunk = readChunk((*it).c_str() + minLCP, (*it).length() - minLCP, 8);
-                size_t bucket = bucketMapper->bucketOf(chunk);
+            bucketMapper->bucketOf(chunks.begin(), chunks.end(), [&](auto chunks_it, size_t bucket) {
+                while (it != end && readChunk(it->c_str() + minLCP, it->length() - minLCP, 8) < *chunks_it) {
+                    ++it;
+                }
                 while (bucket != prev_bucket) {
                     constructBucket();
                     prev_bucket++;
                 }
-                it++;
-            }
+            });
+            it = end;
             while (prev_bucket < bucketMapper->numBuckets + 1) {
                 constructBucket();
                 prev_bucket++;
