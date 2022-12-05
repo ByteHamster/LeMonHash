@@ -4,9 +4,6 @@
 #include <string>
 #include <unordered_set>
 #include <algorithm>
-#include "chunking_strategy/FullChunkingStrategy.h"
-#include "chunking_strategy/GreedyChunkingStrategy.h"
-#include "chunking_strategy/SeparateChunkingStrategy.h"
 #include "bucket_mapping/SuccinctPgmBucketMapper.hpp"
 #include "DirectRankStoring.hpp"
 #include "bucket_mapping/support/EliasFanoModified.hpp"
@@ -39,7 +36,7 @@ class RecursiveDirectRankStoringMmphf {
         // Cut off characters that are the same in all input strings. Useful especially for recursion.
         size_t minLCP = 9999999;
     public:
-        explicit RecursiveDirectRankStoringMmphf(std::vector<std::string> &strings)
+        explicit RecursiveDirectRankStoringMmphf(const std::vector<std::string> &strings)
             : RecursiveDirectRankStoringMmphf(strings.begin(), strings.end(),
                                               new MultiRetrievalDataStructure, true, 0) {
         }
@@ -55,8 +52,8 @@ class RecursiveDirectRankStoringMmphf {
             minLCP = (*begin).length();
             while (it != end) {
                 size_t lengthToCheck = std::min(minLCP, (*it).length());
-                char* s1ptr = (*it).data();
-                char* s2ptr = (*std::prev(it)).data();
+                const char* s1ptr = (*it).data();
+                const char* s2ptr = (*std::prev(it)).data();
                 size_t lcp = knownCommonPrefixLength;
                 while (lcp < lengthToCheck && s1ptr[lcp] == s2ptr[lcp]) {
                     lcp++;
@@ -181,12 +178,12 @@ class RecursiveDirectRankStoringMmphf {
             return sum;
         }
 
-        uint64_t operator ()(std::string &string) {
+        uint64_t operator ()(const std::string &string) {
             return operator()(string, util::MurmurHash64(string));
         }
 
     private:
-        uint64_t operator ()(std::string &string, uint64_t stringHash) {
+        uint64_t operator ()(const std::string &string, uint64_t stringHash) {
             uint64_t chunk = readChunk(string.c_str() + minLCP, string.length() - minLCP, 8);
             size_t bucket = bucketMapper->bucketOf(chunk);
             size_t bucketOffset = *bucketSizePrefix->at(bucket);
