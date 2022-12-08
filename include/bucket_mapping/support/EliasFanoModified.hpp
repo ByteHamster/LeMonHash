@@ -278,7 +278,7 @@ public:
      * Space usage of this data structure, in bytes.
      */
     [[nodiscard]] size_t space() const {
-        return L.capacity()/8 + H.size()/8 + selectStructureOverhead();
+        return L.capacity()/8 + H.size()/8 + selectStructureOverhead() + sizeof(*this);
     }
 
     [[nodiscard]] int selectStructureOverhead() const {

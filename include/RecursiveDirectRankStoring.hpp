@@ -77,6 +77,7 @@ class RecursiveDirectRankStoringMmphf {
             }
             assert(chunks.size() >= 2); // If all were the same, we would have not cut off enough
             bucketMapper = new SuccinctPgmBucketMapper(chunks.begin(), chunks.end());
+            assert(bucketMapper->numBuckets >= 2);
 
             it = begin;
             auto currentBucketBegin = begin;
@@ -159,6 +160,18 @@ class RecursiveDirectRankStoringMmphf {
             std::cout<<"Recursion pointers: "<<8.0*visit([] (auto &obj) { return (obj.recursingBuckets == nullptr ? 0 : obj.recursingBuckets->space())
                                                                         + obj.children.size() * sizeof(uint64_t); })/N<<std::endl;
             std::cout<<"sizeof(*this):      "<<8.0*visit([] (auto &obj) { return sizeof(obj); })/N<<std::endl;
+
+            std::cout<<"Space spent on recursion layers that have only <=10 buckets: "<<8.0 * visit([] (RecursiveDirectRankStoringMmphf &obj) {
+                if (obj.bucketMapper->numBuckets > 10) {
+                    return 0ul;
+                }
+                return obj.bucketMapper->size()
+                       + obj.bucketSizePrefix->space()
+                       + sizeof(obj)
+                       + (obj.recursingBuckets == nullptr ? 0 : obj.recursingBuckets->space())
+                       + obj.children.size() * sizeof(uint64_t);
+            })/N<<std::endl;
+            std::cout<<"Total tree nodes: "<<8.0 * visit([] (RecursiveDirectRankStoringMmphf &obj) { return 1; })<<std::endl;
 
             return retrieval->spaceBits() + 8 * visit([] (RecursiveDirectRankStoringMmphf &obj) {
                 return obj.bucketMapper->size()
