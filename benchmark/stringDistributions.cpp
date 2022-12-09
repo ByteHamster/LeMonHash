@@ -50,6 +50,7 @@ std::vector<std::string> loadFile(std::string &filename, size_t maxStrings) {
             break;
         }
     }
+    delete[] line;
     std::cout<<"Sorting input data"<<std::endl;
     std::sort(inputData.begin(), inputData.end());
     std::cout<<"Loaded "<<inputData.size()<<" strings"<<std::endl;

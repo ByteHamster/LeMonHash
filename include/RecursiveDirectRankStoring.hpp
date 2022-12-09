@@ -34,11 +34,11 @@ class RecursiveDirectRankStoringMmphf {
         std::vector<TreeNode> treeNodes;
         util::EliasFanoM *bucketOffsets;
         SuccinctTree tree;
+        std::vector<std::size_t> bucketOffsetsInput;
     public:
         explicit RecursiveDirectRankStoringMmphf(const std::vector<std::string> &strings) {
-            std::vector<std::size_t> bucketOffsetsInput;
             N = strings.size();
-            constructNode(strings.begin(), strings.end(), 0, 0, bucketOffsetsInput);
+            constructNode(strings.begin(), strings.end(), 0, 0);
             retrieval.build();
             tree.build();
 
@@ -48,38 +48,75 @@ class RecursiveDirectRankStoringMmphf {
                 bucketOffsets->push_back(i);
             }
             bucketOffsets->buildRankSelect();
+            bucketOffsetsInput.clear();
         }
     private:
-        void constructNode(const auto begin, const auto end, const size_t knownCommonPrefixLength, size_t offset,
-                           std::vector<std::size_t> &bucketOffsetsInput) {
+        void constructNode(const auto begin, const auto end, const size_t knownCommonPrefixLength, size_t offset) {
             size_t nodeId = treeNodes.size();
             treeNodes.emplace_back();
             TreeNode treeNode;
             tree.openInnerNode();
 
             bucketOffsetsInput.push_back(offset);
+            treeNode.minLCP = findMinLCP(begin, end, knownCommonPrefixLength);
 
+            std::vector<uint64_t> chunks;
+            extractChunks(begin, end, chunks, treeNode.minLCP);
+            assert(chunks.size() >= 2); // If all were the same, we would have not cut off enough
+            treeNode.bucketMapper = new SuccinctPgmBucketMapper(chunks.begin(), chunks.end());
+            assert(treeNode.bucketMapper->numBuckets >= 2);
+
+            auto it = begin;
+            auto currentBucketBegin = begin;
+            size_t prev_bucket = 0;
+            size_t bucketSizePrefixTemp = 0;
+
+            treeNode.bucketMapper->bucketOf(chunks.begin(), chunks.end(), [&](auto chunks_it, size_t bucket) {
+                while (it != end && readChunk(it->c_str() + treeNode.minLCP, it->length() - treeNode.minLCP, 8) < *chunks_it) {
+                    ++it;
+                }
+                while (prev_bucket < bucket) {
+                    constructChild(currentBucketBegin, it, offset + bucketSizePrefixTemp, treeNode.minLCP);
+                    bucketSizePrefixTemp += std::distance(currentBucketBegin, it);
+                    currentBucketBegin = it;
+                    prev_bucket++;
+                }
+            });
+            it = end;
+            while (prev_bucket < treeNode.bucketMapper->numBuckets) {
+                constructChild(currentBucketBegin, it, offset + bucketSizePrefixTemp, treeNode.minLCP);
+                bucketSizePrefixTemp += std::distance(currentBucketBegin, it);
+                currentBucketBegin = it;
+                prev_bucket++;
+            }
+
+            treeNodes.at(nodeId) = treeNode;
+            tree.closeInnerNode();
+        }
+
+        size_t findMinLCP(const auto begin, const auto end, size_t knownCommonPrefixLength) {
             assert(std::distance(begin, end) >= 2);
             auto it = begin + 1;
-            treeNode.minLCP = (*begin).length();
+            size_t minLCP = (*begin).length();
             while (it != end) {
-                size_t lengthToCheck = std::min(treeNode.minLCP, (*it).length());
+                size_t lengthToCheck = std::min(minLCP, (*it).length());
                 const char* s1ptr = (*it).data();
                 const char* s2ptr = (*std::prev(it)).data();
                 size_t lcp = knownCommonPrefixLength;
                 while (lcp < lengthToCheck && s1ptr[lcp] == s2ptr[lcp]) {
                     lcp++;
                 }
-                treeNode.minLCP = std::min(treeNode.minLCP, lcp);
+                minLCP = std::min(minLCP, lcp);
                 it++;
             }
+            return minLCP;
+        }
 
-            // Trim strings and extract chunks
-            std::vector<uint64_t> chunks;
+        void extractChunks(const auto begin, const auto end, std::vector<uint64_t> &chunks, size_t minLCP) {
             uint64_t previousChunk = 0;
-            it = begin;
+            auto it = begin;
             while (it != end) {
-                uint64_t chunk = readChunk((*it).c_str() + treeNode.minLCP, (*it).length() - treeNode.minLCP, 8);
+                uint64_t chunk = readChunk((*it).c_str() + minLCP, (*it).length() - minLCP, 8);
                 assert(chunk >= previousChunk);
                 if (chunk != previousChunk || chunks.empty()) {
                     chunks.push_back(chunk);
@@ -87,56 +124,29 @@ class RecursiveDirectRankStoringMmphf {
                 }
                 it++;
             }
-            assert(chunks.size() >= 2); // If all were the same, we would have not cut off enough
-            treeNode.bucketMapper = new SuccinctPgmBucketMapper(chunks.begin(), chunks.end());
-            assert(treeNode.bucketMapper->numBuckets >= 2);
+        }
 
-            it = begin;
-            auto currentBucketBegin = begin;
-            size_t prev_bucket = 0;
-            size_t bucketSizePrefixTemp = 0;
-
-            auto constructBucket = [&] {
-                size_t currentBucketSize = std::distance(currentBucketBegin, it);
-                if (currentBucketSize <= 1) {
-                    // Nothing to do
-                    tree.appendLeaf();
-                    bucketOffsetsInput.push_back(offset + bucketSizePrefixTemp);
-                } else if (currentBucketSize < DIRECT_RANK_STORING_THRESHOLD) {
-                    // Perform direct rank storing
-                    uint32_t indexInBucket = 0;
-                    while (currentBucketBegin != it) {
-                        retrieval.addInput(currentBucketSize, util::MurmurHash64(*currentBucketBegin), indexInBucket);
-                        currentBucketBegin++;
-                        indexInBucket++;
-                    }
-                    tree.appendLeaf();
-                    bucketOffsetsInput.push_back(offset + bucketSizePrefixTemp);
-                } else {
-                    // Recurse
-                    constructNode(currentBucketBegin, it, treeNode.minLCP, offset + bucketSizePrefixTemp, bucketOffsetsInput);
+        void constructChild(auto begin, auto end, size_t offset, size_t minLCP) {
+            size_t currentBucketSize = std::distance(begin, end);
+            if (currentBucketSize <= 1) {
+                // Nothing to do
+                tree.appendLeaf();
+                bucketOffsetsInput.push_back(offset);
+            } else if (currentBucketSize < DIRECT_RANK_STORING_THRESHOLD) {
+                // Perform direct rank storing
+                uint32_t indexInBucket = 0;
+                auto it = begin;
+                while (it != end) {
+                    retrieval.addInput(currentBucketSize, util::MurmurHash64(*it), indexInBucket);
+                    it++;
+                    indexInBucket++;
                 }
-
-                currentBucketBegin = it;
-                bucketSizePrefixTemp += currentBucketSize;
-            };
-            treeNode.bucketMapper->bucketOf(chunks.begin(), chunks.end(), [&](auto chunks_it, size_t bucket) {
-                while (it != end && readChunk(it->c_str() + treeNode.minLCP, it->length() - treeNode.minLCP, 8) < *chunks_it) {
-                    ++it;
-                }
-                while (bucket != prev_bucket) {
-                    constructBucket();
-                    prev_bucket++;
-                }
-            });
-            it = end;
-            while (prev_bucket < treeNode.bucketMapper->numBuckets) {
-                constructBucket();
-                prev_bucket++;
+                tree.appendLeaf();
+                bucketOffsetsInput.push_back(offset);
+            } else {
+                // Recurse
+                constructNode(begin, end, minLCP, offset);
             }
-
-            treeNodes.at(nodeId) = treeNode;
-            tree.closeInnerNode();
         }
 
     public:
