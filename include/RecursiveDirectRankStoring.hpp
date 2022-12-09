@@ -22,43 +22,46 @@ class RecursiveDirectRankStoringMmphf {
     private:
         static constexpr size_t DIRECT_RANK_STORING_THRESHOLD = 4096;
 
-        // As in normal DirectRankStoring:
-        SuccinctPgmBucketMapper *bucketMapper = nullptr;
-        util::EliasFanoM *bucketSizePrefix = nullptr;
-        MultiRetrievalDataStructure * const retrieval;
-        uint32_t retrievalSeed; // Common retrieval data structure for all layers ==> each layer needs a unique seed
-        const bool isTopLevel;
+        struct TreeNode {
+            // As in normal DirectRankStoring:
+            SuccinctPgmBucketMapper *bucketMapper = nullptr;
+            util::EliasFanoM *bucketSizePrefix = nullptr;
 
-        // If a bucket is very full, recurse
-        util::EliasFanoM *recursingBuckets = nullptr;
-        std::vector<RecursiveDirectRankStoringMmphf *> children;
+            // If a bucket is very full, recurse. This is treated as pointers to the next layer data structure.
+            std::vector<uint16_t> children; // TODO: Succinct tree representation
 
-        // Cut off characters that are the same in all input strings. Useful especially for recursion.
-        size_t minLCP = 9999999;
+            // Cut off characters that are the same in all input strings. Useful especially for recursion.
+            size_t minLCP = 9999999;
+        };
+
+        MultiRetrievalDataStructure retrieval;
+        size_t N = 0;
+        std::vector<TreeNode> treeNodes;
+
     public:
-        explicit RecursiveDirectRankStoringMmphf(const std::vector<std::string> &strings)
-            : RecursiveDirectRankStoringMmphf(strings.begin(), strings.end(),
-                                              new MultiRetrievalDataStructure, true, 0) {
+        explicit RecursiveDirectRankStoringMmphf(const std::vector<std::string> &strings) {
+            N = strings.size();
+            constructNode(strings.begin(), strings.end(), 0);
+            retrieval.build();
         }
     private:
-        RecursiveDirectRankStoringMmphf(const auto begin, const auto end, MultiRetrievalDataStructure *retrieval_,
-                                        const bool isTopLevel_, const size_t knownCommonPrefixLength)
-                 : retrieval(retrieval_), isTopLevel(isTopLevel_) {
-            static uint32_t nextRetrievalSeed = 0;
-            retrievalSeed = nextRetrievalSeed++;
+        size_t constructNode(const auto begin, const auto end, const size_t knownCommonPrefixLength) {
+            size_t nodeId = treeNodes.size();
+            treeNodes.emplace_back();
+            TreeNode treeNode;
 
             assert(std::distance(begin, end) >= 2);
             auto it = begin + 1;
-            minLCP = (*begin).length();
+            treeNode.minLCP = (*begin).length();
             while (it != end) {
-                size_t lengthToCheck = std::min(minLCP, (*it).length());
+                size_t lengthToCheck = std::min(treeNode.minLCP, (*it).length());
                 const char* s1ptr = (*it).data();
                 const char* s2ptr = (*std::prev(it)).data();
                 size_t lcp = knownCommonPrefixLength;
                 while (lcp < lengthToCheck && s1ptr[lcp] == s2ptr[lcp]) {
                     lcp++;
                 }
-                minLCP = std::min(minLCP, lcp);
+                treeNode.minLCP = std::min(treeNode.minLCP, lcp);
                 it++;
             }
 
@@ -67,7 +70,7 @@ class RecursiveDirectRankStoringMmphf {
             uint64_t previousChunk = 0;
             it = begin;
             while (it != end) {
-                uint64_t chunk = readChunk((*it).c_str() + minLCP, (*it).length() - minLCP, 8);
+                uint64_t chunk = readChunk((*it).c_str() + treeNode.minLCP, (*it).length() - treeNode.minLCP, 8);
                 assert(chunk >= previousChunk);
                 if (chunk != previousChunk || chunks.empty()) {
                     chunks.push_back(chunk);
@@ -76,42 +79,42 @@ class RecursiveDirectRankStoringMmphf {
                 it++;
             }
             assert(chunks.size() >= 2); // If all were the same, we would have not cut off enough
-            bucketMapper = new SuccinctPgmBucketMapper(chunks.begin(), chunks.end());
-            assert(bucketMapper->numBuckets >= 2);
+            treeNode.bucketMapper = new SuccinctPgmBucketMapper(chunks.begin(), chunks.end());
+            assert(treeNode.bucketMapper->numBuckets >= 2);
 
             it = begin;
             auto currentBucketBegin = begin;
             size_t prev_bucket = 0;
             size_t bucketSizePrefixTemp = 0;
-            bucketSizePrefix = new util::EliasFanoM(bucketMapper->numBuckets + 1, std::distance(begin, end) + 1);
-            std::vector<size_t> recursingBucketsInput;
+            treeNode.bucketSizePrefix = new util::EliasFanoM(treeNode.bucketMapper->numBuckets + 1, std::distance(begin, end) + 1);
 
             auto constructBucket = [&] {
                 size_t currentBucketSize = std::distance(currentBucketBegin, it);
                 if (currentBucketSize <= 1) {
                     // Nothing to do
+                    treeNode.children.push_back(-1);
                 } else if (currentBucketSize < DIRECT_RANK_STORING_THRESHOLD) {
                     // Perform direct rank storing
                     uint32_t indexInBucket = 0;
                     while (currentBucketBegin != it) {
-                        retrieval->addInput(currentBucketSize,
-                                    util::remix(util::MurmurHash64(*currentBucketBegin) + retrievalSeed), indexInBucket);
+                        retrieval.addInput(currentBucketSize,
+                                    util::remix(util::MurmurHash64(*currentBucketBegin) + nodeId), indexInBucket);
                         currentBucketBegin++;
                         indexInBucket++;
                     }
+                    treeNode.children.push_back(-1);
                 } else {
                     // Recurse
-                    recursingBucketsInput.push_back(prev_bucket);
-                    children.push_back(new RecursiveDirectRankStoringMmphf(
-                                currentBucketBegin, it, retrieval, false, minLCP));
+                    size_t nodeId = constructNode(currentBucketBegin, it, treeNode.minLCP);
+                    treeNode.children.push_back(nodeId);
                 }
 
-                bucketSizePrefix->push_back(bucketSizePrefixTemp);
+                treeNode.bucketSizePrefix->push_back(bucketSizePrefixTemp);
                 currentBucketBegin = it;
                 bucketSizePrefixTemp += currentBucketSize;
             };
-            bucketMapper->bucketOf(chunks.begin(), chunks.end(), [&](auto chunks_it, size_t bucket) {
-                while (it != end && readChunk(it->c_str() + minLCP, it->length() - minLCP, 8) < *chunks_it) {
+            treeNode.bucketMapper->bucketOf(chunks.begin(), chunks.end(), [&](auto chunks_it, size_t bucket) {
+                while (it != end && readChunk(it->c_str() + treeNode.minLCP, it->length() - treeNode.minLCP, 8) < *chunks_it) {
                     ++it;
                 }
                 while (bucket != prev_bucket) {
@@ -120,30 +123,21 @@ class RecursiveDirectRankStoringMmphf {
                 }
             });
             it = end;
-            while (prev_bucket < bucketMapper->numBuckets + 1) {
+            while (prev_bucket < treeNode.bucketMapper->numBuckets + 1) {
                 constructBucket();
                 prev_bucket++;
             }
-            bucketSizePrefix->buildRankSelect();
-            if (!recursingBucketsInput.empty()) {
-                recursingBuckets = new util::EliasFanoM(bucketMapper->numBuckets, bucketMapper->numBuckets + 1);
-                for (size_t b : recursingBucketsInput) {
-                    recursingBuckets->push_back(b);
-                }
-                recursingBuckets->buildRankSelect();
-            }
-            if (isTopLevel) {
-                retrieval->build();
-            }
+            treeNode.bucketSizePrefix->buildRankSelect();
+
+            treeNodes.at(nodeId) = treeNode;
+            return nodeId;
         }
 
     public:
         ~RecursiveDirectRankStoringMmphf() {
-            delete bucketMapper;
-            delete bucketSizePrefix;
-            delete recursingBuckets;
-            for (auto *child : children) {
-                delete child;
+            for (TreeNode &node : treeNodes) {
+                delete node.bucketMapper;
+                delete node.bucketSizePrefix;
             }
         }
 
@@ -152,67 +146,51 @@ class RecursiveDirectRankStoringMmphf {
         }
 
         size_t spaceBits() {
-            assert(isTopLevel);
-            size_t N = *(bucketSizePrefix->at(bucketSizePrefix->size() - 1));
-            std::cout<<"Retrieval:          "<<1.0*retrieval->spaceBits()/N<<std::endl;
-            std::cout<<"Bucket size prefix: "<<8.0*visit([] (auto &obj) { return obj.bucketSizePrefix->size(); })/N<<std::endl;
-            std::cout<<"PGM:                "<<8.0*visit([] (auto &obj) { return obj.bucketMapper->size(); })/N<<std::endl;
-            std::cout<<"Recursion pointers: "<<8.0*visit([] (auto &obj) { return (obj.recursingBuckets == nullptr ? 0 : obj.recursingBuckets->space())
-                                                                        + obj.children.size() * sizeof(uint64_t); })/N<<std::endl;
-            std::cout<<"sizeof(*this):      "<<8.0*visit([] (auto &obj) { return sizeof(obj); })/N<<std::endl;
+            std::cout<<"Retrieval:             "<<1.0*retrieval.spaceBits()/N<<std::endl;
+            std::cout<<"Bucket size prefix:    "<<8.0*std::accumulate(treeNodes.begin(), treeNodes.end(), 0,
+                                 [] (size_t size, TreeNode &node) { return size + node.bucketSizePrefix->space(); }) / N << std::endl;
+            std::cout<<"PGM:                   "<<8.0*std::accumulate(treeNodes.begin(), treeNodes.end(), 0,
+                                 [] (size_t size, TreeNode &node) { return size + node.bucketMapper->size(); }) / N<<std::endl;
+            std::cout<<"Child pointers:        "<<8.0*std::accumulate(treeNodes.begin(), treeNodes.end(), 0,
+                                 [] (size_t size, TreeNode &node) { return size + node.children.size()*sizeof(uint16_t); }) / N<<std::endl;
+            std::cout<<"sizeof(*this + nodes): "<<8.0*(sizeof(*this) + treeNodes.size() * sizeof(TreeNode))/N<<std::endl;
+            std::cout<<"Total tree nodes:      "<<treeNodes.size()<<std::endl;
 
-            std::cout<<"Space spent on recursion layers that have only <=10 buckets: "<<8.0 * visit([] (RecursiveDirectRankStoringMmphf &obj) {
-                if (obj.bucketMapper->numBuckets > 10) {
-                    return 0ul;
-                }
-                return obj.bucketMapper->size()
-                       + obj.bucketSizePrefix->space()
-                       + sizeof(obj)
-                       + (obj.recursingBuckets == nullptr ? 0 : obj.recursingBuckets->space())
-                       + obj.children.size() * sizeof(uint64_t);
-            })/N<<std::endl;
-            std::cout<<"Total tree nodes: "<<8.0 * visit([] (RecursiveDirectRankStoringMmphf &obj) { return 1; })<<std::endl;
-
-            return retrieval->spaceBits() + 8 * visit([] (RecursiveDirectRankStoringMmphf &obj) {
-                return obj.bucketMapper->size()
-                     + obj.bucketSizePrefix->space()
-                     + sizeof(obj)
-                     + (obj.recursingBuckets == nullptr ? 0 : obj.recursingBuckets->space())
-                     + obj.children.size() * sizeof(uint64_t);
-                });
-        }
-
-        template <typename T>
-        size_t visit(T visitor) {
-            size_t sum = visitor(*this);
-            for (auto *child : children) {
-                sum += child->visit(visitor);
-            }
-            return sum;
+            return retrieval.spaceBits()
+                        + 8 * (sizeof(*this) + treeNodes.size() * sizeof(TreeNode))
+                        + 8 * std::accumulate(treeNodes.begin(), treeNodes.end(), 0,
+                                          [] (size_t size, TreeNode &node) {
+                            return size + node.children.size() * sizeof(uint16_t)
+                                        + node.bucketMapper->size()
+                                        + node.bucketSizePrefix->space();
+                        });
         }
 
         uint64_t operator ()(const std::string &string) {
-            return operator()(string, util::MurmurHash64(string));
-        }
+            uint64_t stringHash = util::MurmurHash64(string);
 
-    private:
-        uint64_t operator ()(const std::string &string, uint64_t stringHash) {
-            uint64_t chunk = readChunk(string.c_str() + minLCP, string.length() - minLCP, 8);
-            size_t bucket = bucketMapper->bucketOf(chunk);
-            size_t bucketOffset = *bucketSizePrefix->at(bucket);
-            size_t nextBucketOffset = *bucketSizePrefix->at(bucket + 1);
-            size_t bucketSize = nextBucketOffset - bucketOffset;
+            TreeNode node = treeNodes.at(0);
+            size_t nodeId = 0;
+            size_t keysBefore = 0;
+            while (true) {
+                uint64_t chunk = readChunk(string.c_str() + node.minLCP, string.length() - node.minLCP, 8);
+                size_t bucket = node.bucketMapper->bucketOf(chunk);
+                size_t bucketOffset = *node.bucketSizePrefix->at(bucket);
+                size_t nextBucketOffset = *node.bucketSizePrefix->at(bucket + 1);
+                size_t bucketSize = nextBucketOffset - bucketOffset;
+                keysBefore += bucketOffset;
 
-            if (bucketSize < DIRECT_RANK_STORING_THRESHOLD) {
-                // Perform direct rank storing
-                if (bucketSize == 1) {
-                    return bucketOffset;
+                if (bucketSize < DIRECT_RANK_STORING_THRESHOLD) {
+                    // Perform direct rank storing
+                    if (bucketSize == 1) {
+                        return keysBefore;
+                    } else {
+                        return keysBefore + retrieval.query(bucketSize, util::remix(stringHash + nodeId));
+                    }
                 } else {
-                    return bucketOffset + retrieval->query(bucketSize, util::remix(stringHash + retrievalSeed));
+                    nodeId = node.children.at(bucket);
+                    node = treeNodes.at(nodeId);
                 }
-            } else {
-                size_t childPos = recursingBuckets->predecessorPosition(bucket).index(); // Rank query
-                return bucketOffset + children.at(childPos)->operator()(string, stringHash);
             }
         }
 };
