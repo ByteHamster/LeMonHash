@@ -26,10 +26,7 @@ class RecursiveDirectRankStoringMmphf {
         static constexpr bool CLOSING_NODE = true;
 
         struct TreeNode {
-            // As in normal DirectRankStoring:
             SuccinctPgmBucketMapper *bucketMapper = nullptr;
-            util::EliasFanoM *bucketSizePrefix = nullptr;
-            // Cut off characters that are the same in all input strings. Useful especially for recursion.
             size_t minLCP = 9999999;
         };
 
@@ -43,23 +40,32 @@ class RecursiveDirectRankStoringMmphf {
         BitVectorBuilder nodeHasDataBuilder;
         pasta::BitVector nodeHasData;
         pasta::FlatRankSelect<pasta::OptimizedFor::ZERO_QUERIES> *nodeHasDataRankSelect = nullptr;
+        std::vector<std::size_t> bucketOffsetsInput;
+        util::EliasFanoM *bucketOffsets;
 
     public:
         explicit RecursiveDirectRankStoringMmphf(const std::vector<std::string> &strings) {
             N = strings.size();
-            constructNode(strings.begin(), strings.end(), 0);
+            constructNode(strings.begin(), strings.end(), 0, 0);
             retrieval.build();
             succinctTreeRepresentation = succinctTreeBuilder.build();
             nodeHasData = nodeHasDataBuilder.build();
             nodeHasDataRankSelect = new pasta::FlatRankSelect<pasta::OptimizedFor::ZERO_QUERIES>(nodeHasData);
+            bucketOffsetsInput.push_back(N);
+            bucketOffsets = new util::EliasFanoM(bucketOffsetsInput.size(), N + 1);
+            for (size_t i : bucketOffsetsInput) {
+                bucketOffsets->push_back(i);
+            }
+            bucketOffsets->buildRankSelect();
         }
     private:
-        void constructNode(const auto begin, const auto end, const size_t knownCommonPrefixLength) {
+        void constructNode(const auto begin, const auto end, const size_t knownCommonPrefixLength, size_t offset) {
             size_t nodeId = treeNodes.size();
             treeNodes.emplace_back();
             TreeNode treeNode;
             succinctTreeBuilder.append(OPENING_NODE);
             nodeHasDataBuilder.append(true);
+            bucketOffsetsInput.push_back(offset);
 
             assert(std::distance(begin, end) >= 2);
             auto it = begin + 1;
@@ -97,7 +103,6 @@ class RecursiveDirectRankStoringMmphf {
             auto currentBucketBegin = begin;
             size_t prev_bucket = 0;
             size_t bucketSizePrefixTemp = 0;
-            treeNode.bucketSizePrefix = new util::EliasFanoM(treeNode.bucketMapper->numBuckets + 1, std::distance(begin, end) + 1);
 
             auto constructBucket = [&] {
                 size_t currentBucketSize = std::distance(currentBucketBegin, it);
@@ -106,6 +111,7 @@ class RecursiveDirectRankStoringMmphf {
                     succinctTreeBuilder.append(OPENING_NODE);
                     succinctTreeBuilder.append(CLOSING_NODE);
                     nodeHasDataBuilder.append(false);
+                    bucketOffsetsInput.push_back(offset + bucketSizePrefixTemp);
                 } else if (currentBucketSize < DIRECT_RANK_STORING_THRESHOLD) {
                     // Perform direct rank storing
                     uint32_t indexInBucket = 0;
@@ -118,12 +124,12 @@ class RecursiveDirectRankStoringMmphf {
                     succinctTreeBuilder.append(OPENING_NODE);
                     succinctTreeBuilder.append(CLOSING_NODE);
                     nodeHasDataBuilder.append(false);
+                    bucketOffsetsInput.push_back(offset + bucketSizePrefixTemp);
                 } else {
                     // Recurse
-                    constructNode(currentBucketBegin, it, treeNode.minLCP);
+                    constructNode(currentBucketBegin, it, treeNode.minLCP, offset + bucketSizePrefixTemp);
                 }
 
-                treeNode.bucketSizePrefix->push_back(bucketSizePrefixTemp);
                 currentBucketBegin = it;
                 bucketSizePrefixTemp += currentBucketSize;
             };
@@ -137,12 +143,11 @@ class RecursiveDirectRankStoringMmphf {
                 }
             });
             it = end;
-            while (prev_bucket < treeNode.bucketMapper->numBuckets + 1) {
+            while (prev_bucket < treeNode.bucketMapper->numBuckets) {
                 constructBucket();
                 prev_bucket++;
             }
 
-            treeNode.bucketSizePrefix->buildRankSelect();
             treeNodes.at(nodeId) = treeNode;
             succinctTreeBuilder.append(CLOSING_NODE);
         }
@@ -151,7 +156,6 @@ class RecursiveDirectRankStoringMmphf {
         ~RecursiveDirectRankStoringMmphf() {
             for (TreeNode &node : treeNodes) {
                 delete node.bucketMapper;
-                delete node.bucketSizePrefix;
             }
         }
 
@@ -161,8 +165,7 @@ class RecursiveDirectRankStoringMmphf {
 
         size_t spaceBits() {
             std::cout<<"Retrieval:             "<<1.0*retrieval.spaceBits()/N<<std::endl;
-            std::cout<<"Bucket size prefix:    "<<8.0*std::accumulate(treeNodes.begin(), treeNodes.end(), 0,
-                                 [] (size_t size, TreeNode &node) { return size + node.bucketSizePrefix->space(); }) / N << std::endl;
+            std::cout<<"Bucket size prefix:    "<<8.0*bucketOffsets->space()/N << std::endl;
             std::cout<<"PGM:                   "<<8.0*std::accumulate(treeNodes.begin(), treeNodes.end(), 0,
                                  [] (size_t size, TreeNode &node) { return size + node.bucketMapper->size(); }) / N<<std::endl;
             std::cout<<"Tree representation:   "<<1.0*(succinctTreeRepresentation.size() + nodeHasData.size())/N<<std::endl;
@@ -172,55 +175,74 @@ class RecursiveDirectRankStoringMmphf {
                         + 8 * (sizeof(*this) + treeNodes.size() * sizeof(TreeNode))
                         + succinctTreeRepresentation.size()
                         + nodeHasData.size()
+                        + 8 * bucketOffsets->space()
                         + 8 * std::accumulate(treeNodes.begin(), treeNodes.end(), 0,
                                           [] (size_t size, TreeNode &node) {
-                            return size + node.bucketMapper->size()
-                                        + node.bucketSizePrefix->space();
+                            return size + node.bucketMapper->size();
                         });
         }
+
+        struct TreeReader {
+            size_t indexInTreeRepresentation = 0;
+            size_t nodeId = 0;
+            pasta::BitVector &treeRepresentation;
+
+            explicit TreeReader(pasta::BitVector &treeRepresentation)
+                    : treeRepresentation(treeRepresentation) {
+            }
+
+            // TODO: This is possible in constant time. For now, just iterate.
+            void skipToNthChild(size_t child) {
+                indexInTreeRepresentation++;
+                nodeId++;
+                for (size_t i = 0; i < child; i++) {
+                    nextSibling();
+                }
+            }
+
+            void nextSibling() {
+                size_t excess = 0;
+                do {
+                    if (treeRepresentation[indexInTreeRepresentation] == OPENING_NODE) {
+                        excess++;
+                        nodeId++;
+                    } else {
+                        excess--;
+                    }
+                    indexInTreeRepresentation++;
+                } while (excess != 0);
+            }
+        };
 
         uint64_t operator ()(const std::string &string) {
             uint64_t stringHash = util::MurmurHash64(string);
 
-            TreeNode node = treeNodes.at(0);
-            size_t indexInTreeRepresentation = 0;
-            size_t nodeId = 0;
-            size_t keysBefore = 0;
+            TreeReader treeReader(succinctTreeRepresentation);
+            TreeNode node = treeNodes.at(treeReader.nodeId);
             while (true) {
                 uint64_t chunk = readChunk(string.c_str() + node.minLCP, string.length() - node.minLCP, 8);
                 size_t bucket = node.bucketMapper->bucketOf(chunk);
-                size_t bucketOffset = *node.bucketSizePrefix->at(bucket);
-                size_t nextBucketOffset = *node.bucketSizePrefix->at(bucket + 1);
-                size_t bucketSize = nextBucketOffset - bucketOffset;
-                keysBefore += bucketOffset;
+                size_t parentNodeId = treeReader.nodeId;
 
+                TreeReader nextBucket = treeReader;
+                treeReader.skipToNthChild(bucket);
+                nextBucket.skipToNthChild(bucket + 1);
+                size_t bucketOffset = *bucketOffsets->at(treeReader.nodeId);
+                size_t nextBucketOffset = *bucketOffsets->at(nextBucket.nodeId);
+                size_t bucketSize = nextBucketOffset - bucketOffset;
+
+                assert(bucketSize >= 1 && "Key not in original data set, bucket size is 0");
                 if (bucketSize < DIRECT_RANK_STORING_THRESHOLD) {
                     // Perform direct rank storing
                     if (bucketSize == 1) {
-                        return keysBefore;
+                        return bucketOffset;
                     } else {
-                        size_t storagePosition = nodeHasDataRankSelect->rank1(nodeId);
+                        size_t storagePosition = nodeHasDataRankSelect->rank1(parentNodeId);
                         size_t indexInBucket = retrieval.query(bucketSize, util::remix(stringHash + storagePosition));
-                        return keysBefore + indexInBucket;
+                        return bucketOffset + indexInBucket;
                     }
                 } else {
-                    // TODO: This is possible in constant time. For now, just iterate.
-                    indexInTreeRepresentation++; // Opening this node
-                    for (size_t i = 0; i < bucket; i++) {
-                        // Skip previous bucket
-                        size_t excess = 0;
-                        do {
-                            if (succinctTreeRepresentation[indexInTreeRepresentation] == OPENING_NODE) {
-                                excess++;
-                                nodeId++;
-                            } else {
-                                excess--;
-                            }
-                            indexInTreeRepresentation++;
-                        } while (excess != 0);
-                    }
-                    nodeId++;
-                    size_t storagePosition = nodeHasDataRankSelect->rank1(nodeId);
+                    size_t storagePosition = nodeHasDataRankSelect->rank1(treeReader.nodeId);
                     node = treeNodes.at(storagePosition);
                 }
             }
