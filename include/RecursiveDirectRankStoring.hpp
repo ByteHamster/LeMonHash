@@ -68,7 +68,7 @@ class RecursiveDirectRankStoringMmphf {
             } else {
                 treeNode.bucketMapper = new SuccinctPgmBucketMapper(chunks.begin(), chunks.end());
             }
-            assert(treeNode.bucketMapper->numBuckets >= 2);
+            assert(treeNode.bucketMapper->numBuckets() >= 2);
 
             auto it = begin;
             auto currentBucketBegin = begin;
