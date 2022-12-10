@@ -1,5 +1,7 @@
 #pragma once
 
+#include "GrowingPastaBitVector.hpp"
+
 /**
  * Balanced Parentheses Succinct Tree.
  * Allows to retrieve the rank of an inner nodes in order to compactly store data only for inner nodes.
@@ -9,38 +11,36 @@ class SuccinctTree {
         static constexpr bool OPENING_NODE = false;
         static constexpr bool CLOSING_NODE = true;
 
-        BitVectorBuilder succinctTreeBuilder;
-        pasta::BitVector succinctTreeRepresentation;
-        BitVectorBuilder nodeIsInnerNodeBuilder;
-        pasta::BitVector nodeIsInnerNode;
+        GrowingPastaBitVector succinctTreeRepresentation;
+        GrowingPastaBitVector nodeIsInnerNode;
         pasta::FlatRankSelect<pasta::OptimizedFor::ZERO_QUERIES> *nodeIsInnerNodeRankSelect = nullptr;
     public:
         SuccinctTree() = default;
 
         void openInnerNode() {
-            succinctTreeBuilder.append(OPENING_NODE);
-            nodeIsInnerNodeBuilder.append(true);
+            succinctTreeRepresentation.append(OPENING_NODE);
+            nodeIsInnerNode.append(true);
         }
 
         void closeInnerNode() {
-            succinctTreeBuilder.append(CLOSING_NODE);
+            succinctTreeRepresentation.append(CLOSING_NODE);
         }
 
         void appendLeaf() {
-            succinctTreeBuilder.append(OPENING_NODE);
-            succinctTreeBuilder.append(CLOSING_NODE);
-            nodeIsInnerNodeBuilder.append(false);
+            succinctTreeRepresentation.append(OPENING_NODE);
+            succinctTreeRepresentation.append(CLOSING_NODE);
+            nodeIsInnerNode.append(false);
         }
 
         void build() {
-            succinctTreeRepresentation = succinctTreeBuilder.build();
-            nodeIsInnerNode = nodeIsInnerNodeBuilder.build();
-            nodeIsInnerNodeRankSelect = new pasta::FlatRankSelect<pasta::OptimizedFor::ZERO_QUERIES>(nodeIsInnerNode);
+            nodeIsInnerNode.shrinkToFit();
+            succinctTreeRepresentation.shrinkToFit();
+            nodeIsInnerNodeRankSelect = new pasta::FlatRankSelect<pasta::OptimizedFor::ZERO_QUERIES>(nodeIsInnerNode.data);
         }
 
         size_t spaceBits() {
-            return succinctTreeRepresentation.size()
-                + nodeIsInnerNode.size()
+            return succinctTreeRepresentation.data.size()
+                + nodeIsInnerNode.data.size()
                 + 8 * nodeIsInnerNodeRankSelect->space_usage();
         }
 
@@ -66,7 +66,7 @@ class SuccinctTree {
             void nextSibling() {
                 size_t excess = 0;
                 do {
-                    if (tree.succinctTreeRepresentation[indexInTreeRepresentation] == OPENING_NODE) {
+                    if (tree.succinctTreeRepresentation.data[indexInTreeRepresentation] == OPENING_NODE) {
                         excess++;
                         nodeId++;
                     } else {

@@ -8,7 +8,6 @@
 #include "DirectRankStoring.hpp"
 #include "bucket_mapping/support/EliasFanoModified.hpp"
 #include <MurmurHash64.h>
-#include <support/BitVectorBuilder.hpp>
 #include <support/SuccinctTree.hpp>
 
 /**
