@@ -21,10 +21,11 @@
  */
 class RecursiveDirectRankStoringMmphf {
     private:
-        static constexpr size_t DIRECT_RANK_STORING_THRESHOLD = 4096;
+        static constexpr size_t DIRECT_RANK_STORING_THRESHOLD = 1024;
+        static constexpr size_t LINEAR_MAPPING_THRESHOLD = 500;
 
         struct TreeNode {
-            SuccinctPgmBucketMapper *bucketMapper = nullptr;
+            BucketMapper *bucketMapper = nullptr;
             size_t minLCP = 9999999;
         };
 
@@ -62,7 +63,11 @@ class RecursiveDirectRankStoringMmphf {
             std::vector<uint64_t> chunks;
             extractChunks(begin, end, chunks, treeNode.minLCP);
             assert(chunks.size() >= 2); // If all were the same, we would have not cut off enough
-            treeNode.bucketMapper = new SuccinctPgmBucketMapper(chunks.begin(), chunks.end());
+            if (chunks.size() <= LINEAR_MAPPING_THRESHOLD) {
+                treeNode.bucketMapper = new LinearBucketMapper(chunks.begin(), chunks.end());
+            } else {
+                treeNode.bucketMapper = new SuccinctPgmBucketMapper(chunks.begin(), chunks.end());
+            }
             assert(treeNode.bucketMapper->numBuckets >= 2);
 
             auto it = begin;
@@ -82,7 +87,7 @@ class RecursiveDirectRankStoringMmphf {
                 }
             });
             it = end;
-            while (prev_bucket < treeNode.bucketMapper->numBuckets) {
+            while (prev_bucket < treeNode.bucketMapper->numBuckets()) {
                 constructChild(currentBucketBegin, it, offset + bucketSizePrefixTemp, treeNode.minLCP);
                 bucketSizePrefixTemp += std::distance(currentBucketBegin, it);
                 currentBucketBegin = it;
@@ -150,6 +155,7 @@ class RecursiveDirectRankStoringMmphf {
 
     public:
         ~RecursiveDirectRankStoringMmphf() {
+            delete bucketOffsets;
             for (TreeNode &node : treeNodes) {
                 delete node.bucketMapper;
             }
@@ -160,12 +166,16 @@ class RecursiveDirectRankStoringMmphf {
         }
 
         size_t spaceBits() {
-            std::cout<<"Retrieval:             "<<1.0*retrieval.spaceBits()/N<<std::endl;
-            std::cout<<"PGM in tree nodes:     "<<8.0*std::accumulate(treeNodes.begin(), treeNodes.end(), 0,
+            std::cout<<"Retrieval:           "<<1.0*retrieval.spaceBits()/N<<std::endl;
+            std::cout<<"Bucket mappers:      "<<8.0*std::accumulate(treeNodes.begin(), treeNodes.end(), 0,
                                  [] (size_t size, TreeNode &node) { return size + node.bucketMapper->size(); }) / N<<std::endl;
-            std::cout<<"Bucket size prefix:    "<<8.0*bucketOffsets->space()/N << std::endl;
-            std::cout<<"Tree representation:   "<<1.0*tree.spaceBits()/N<<std::endl;
-            std::cout<<"Tree node data:        "<<8.0*(treeNodes.size() * sizeof(TreeNode))/N<<std::endl;
+            std::cout<<"  PGM:                 "<<8.0*std::accumulate(treeNodes.begin(), treeNodes.end(), 0,
+                                 [] (size_t size, TreeNode &node) { return size + ((node.bucketMapper->numBuckets() > LINEAR_MAPPING_THRESHOLD) ? node.bucketMapper->size() : 0); }) / N<<std::endl;
+            std::cout<<"  Linear:              "<<8.0*std::accumulate(treeNodes.begin(), treeNodes.end(), 0,
+                                 [] (size_t size, TreeNode &node) { return size + ((node.bucketMapper->numBuckets() <= LINEAR_MAPPING_THRESHOLD) ? node.bucketMapper->size() : 0); }) / N<<std::endl;
+            std::cout<<"Bucket size prefix:  "<<8.0*bucketOffsets->space()/N << std::endl;
+            std::cout<<"Tree representation: "<<1.0*tree.spaceBits()/N<<std::endl;
+            std::cout<<"Tree node data:      "<<8.0*(treeNodes.size() * sizeof(TreeNode))/N<<std::endl;
 
             return retrieval.spaceBits()
                         + 8 * (sizeof(*this) + treeNodes.size() * sizeof(TreeNode))

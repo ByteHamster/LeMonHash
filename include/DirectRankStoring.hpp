@@ -33,7 +33,7 @@ class DirectRankStoringMmphf {
         explicit DirectRankStoringMmphf(std::vector<uint64_t> &data)
                 : N(data.size()),
                   bucketMapper(data.begin(), data.end()),
-                  bucketSizePrefix(bucketMapper.numBuckets + 1, data.size() + 1) {
+                  bucketSizePrefix(bucketMapper.numBuckets() + 1, data.size() + 1) {
 
             std::vector<uint64_t> currentBucket;
             size_t prev_bucket = 0;
@@ -65,7 +65,7 @@ class DirectRankStoringMmphf {
                 currentBucket.push_back(*it);
             });
 
-            while (prev_bucket < bucketMapper.numBuckets + 1) {
+            while (prev_bucket < bucketMapper.numBuckets() + 1) {
                 constructBucket();
                 prev_bucket++;
             }
