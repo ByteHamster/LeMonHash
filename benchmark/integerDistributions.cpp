@@ -4,13 +4,13 @@
 #include <ExampleCompetitorMmphfs.hpp>
 #include "simpleMmphfBenchmark.hpp"
 
-template <float rankMin, float rankDelta, float rankMax>
+/*template <float rankMin, float rankDelta, float rankMax>
 void dispatchDirectRankStoring(std::vector<uint64_t> &inputData) {
     simpleMmphfBenchmark<DirectRankStoringMmphf<LinearBucketMapper<rankMin>>>(inputData);
     if constexpr (rankMin < rankMax) {
         dispatchDirectRankStoring<rankMin+rankDelta, rankDelta, rankMax>(inputData);
     }
-}
+}*/
 
 std::vector<uint64_t> randomUniform(size_t n, uint64_t u) {
     std::vector<uint64_t> dataset;
