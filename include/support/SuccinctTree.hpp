@@ -1,6 +1,7 @@
 #pragma once
 
-#include "GrowingPastaBitVector.hpp"
+#include "GrowingSdslBitVector.hpp"
+#include "sdsl/bp_support.hpp"
 
 /**
  * Balanced Parentheses Succinct Tree.
@@ -8,12 +9,14 @@
  */
 class SuccinctTree {
     private:
-        static constexpr bool OPENING_NODE = false;
-        static constexpr bool CLOSING_NODE = true;
+        static constexpr bool OPENING_NODE = true;
+        static constexpr bool CLOSING_NODE = false;
 
-        GrowingPastaBitVector succinctTreeRepresentation;
-        GrowingPastaBitVector nodeIsInnerNode;
-        pasta::FlatRankSelect<pasta::OptimizedFor::ZERO_QUERIES> *nodeIsInnerNodeRankSelect = nullptr;
+        GrowingSdslBitVector succinctTreeRepresentation;
+        sdsl::bit_vector::rank_1_type succinctTreeRepresentationRank;
+        sdsl::bp_support_g<> succinctTreeBpSupport;
+        GrowingSdslBitVector nodeIsInnerNode;
+        sdsl::bit_vector::rank_1_type nodeIsInnerNodeRank;
     public:
         SuccinctTree() = default;
 
@@ -34,14 +37,18 @@ class SuccinctTree {
 
         void build() {
             nodeIsInnerNode.shrinkToFit();
+            nodeIsInnerNodeRank = sdsl::bit_vector::rank_1_type(&nodeIsInnerNode.data);
             succinctTreeRepresentation.shrinkToFit();
-            nodeIsInnerNodeRankSelect = new pasta::FlatRankSelect<pasta::OptimizedFor::ZERO_QUERIES>(nodeIsInnerNode.data);
+            succinctTreeRepresentationRank = sdsl::bit_vector::rank_1_type(&succinctTreeRepresentation.data);
+            succinctTreeBpSupport = sdsl::bp_support_g<>(&succinctTreeRepresentation.data);
         }
 
         size_t spaceBits() {
             return succinctTreeRepresentation.data.size()
                 + nodeIsInnerNode.data.size()
-                + 8 * nodeIsInnerNodeRankSelect->space_usage();
+                + nodeIsInnerNodeRank.bit_size()
+                + succinctTreeBpSupport.bit_size()
+                + succinctTreeRepresentationRank.bit_size();
         }
 
         struct Reader {
@@ -57,27 +64,20 @@ class SuccinctTree {
                 indexInTreeRepresentation++;
                 nodeId++;
                 for (size_t i = 0; i < child; i++) {
-                    nextSibling();
+                    indexInTreeRepresentation = tree.succinctTreeBpSupport.find_close(indexInTreeRepresentation) + 1;
                 }
+                nodeId = tree.succinctTreeRepresentationRank.rank(indexInTreeRepresentation);
             }
 
             // Note that calling this on the last child renders the internal state invalid,
             // but the nodeId then still points to a DFS number one more than the size of the last child.
             void nextSibling() {
-                size_t excess = 0;
-                do {
-                    if (tree.succinctTreeRepresentation.data[indexInTreeRepresentation] == OPENING_NODE) {
-                        excess++;
-                        nodeId++;
-                    } else {
-                        excess--;
-                    }
-                    indexInTreeRepresentation++;
-                } while (excess != 0);
+                indexInTreeRepresentation = tree.succinctTreeBpSupport.find_close(indexInTreeRepresentation) + 1;
+                nodeId = tree.succinctTreeRepresentationRank.rank(indexInTreeRepresentation);
             }
 
             size_t innerNodeRank() {
-                return tree.nodeIsInnerNodeRankSelect->rank1(nodeId);
+                return tree.nodeIsInnerNodeRank.rank(nodeId);
             }
         };
 };

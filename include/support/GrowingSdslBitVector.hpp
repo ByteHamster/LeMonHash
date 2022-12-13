@@ -2,10 +2,10 @@
 
 #include <pasta/bit_vector/bit_vector.hpp>
 
-class GrowingPastaBitVector {
+class GrowingSdslBitVector {
     public:
         size_t size = 0;
-        pasta::BitVector data;
+        sdsl::bit_vector data;
 
         void append(bool x) {
             if (data.size() < size + 1) {
