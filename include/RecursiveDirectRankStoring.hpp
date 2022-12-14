@@ -177,6 +177,7 @@ class RecursiveDirectRankStoringMmphf {
                                  [] (size_t size, TreeNode &node) { return size + ((node.bucketMapper->numBuckets() <= LINEAR_MAPPING_THRESHOLD) ? node.bucketMapper->size() : 0); }) / N<<std::endl;
             std::cout<<"Bucket size prefix:  "<<8.0*bucketOffsets->space()/N << std::endl;
             std::cout<<"Tree representation: "<<1.0*tree.spaceBits()/N<<std::endl;
+            std::cout<<"  Without indices:     "<<1.0*tree.spaceBitsWithoutIndices()/N<<std::endl;
             std::cout<<"Tree node data:      "<<8.0*(treeNodes.size() * sizeof(TreeNode))/N<<std::endl;
 
             return retrieval.spaceBits()

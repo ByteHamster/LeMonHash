@@ -51,6 +51,11 @@ class SuccinctTree {
                 + succinctTreeRepresentationRank.bit_size();
         }
 
+        size_t spaceBitsWithoutIndices() {
+            return succinctTreeRepresentation.data.size()
+                + nodeIsInnerNode.data.size();
+        }
+
         struct Reader {
             size_t indexInTreeRepresentation = 0;
             size_t nodeId = 0;
