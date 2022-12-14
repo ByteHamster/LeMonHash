@@ -126,6 +126,7 @@ int main(int argc, char** argv) {
     }
 
     simpleMmphfBenchmark<RecursiveDirectRankStoringMmphf>(inputData);
+    simpleMmphfBenchmark<RecursiveDirectRankStoringV2Mmphf>(inputData);
 
     return 0;
 }
