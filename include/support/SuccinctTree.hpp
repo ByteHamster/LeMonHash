@@ -13,8 +13,7 @@ class SuccinctTree {
         static constexpr bool CLOSING_NODE = false;
 
         GrowingSdslBitVector succinctTreeRepresentation;
-        sdsl::bit_vector::rank_1_type succinctTreeRepresentationRank;
-        sdsl::bp_support_g<> succinctTreeBpSupport;
+        sdsl::bp_support_gg<> succinctTreeBpSupport;
         GrowingSdslBitVector nodeIsInnerNode;
         sdsl::bit_vector::rank_1_type nodeIsInnerNodeRank;
     public:
@@ -39,16 +38,14 @@ class SuccinctTree {
             nodeIsInnerNode.shrinkToFit();
             nodeIsInnerNodeRank = sdsl::bit_vector::rank_1_type(&nodeIsInnerNode.data);
             succinctTreeRepresentation.shrinkToFit();
-            succinctTreeRepresentationRank = sdsl::bit_vector::rank_1_type(&succinctTreeRepresentation.data);
-            succinctTreeBpSupport = sdsl::bp_support_g<>(&succinctTreeRepresentation.data);
+            succinctTreeBpSupport = sdsl::bp_support_gg<>(&succinctTreeRepresentation.data);
         }
 
         size_t spaceBits() {
             return succinctTreeRepresentation.data.size()
                 + nodeIsInnerNode.data.size()
                 + nodeIsInnerNodeRank.bit_size()
-                + succinctTreeBpSupport.bit_size()
-                + succinctTreeRepresentationRank.bit_size();
+                + succinctTreeBpSupport.bit_size();
         }
 
         size_t spaceBitsWithoutIndices() {
@@ -71,14 +68,14 @@ class SuccinctTree {
                 for (size_t i = 0; i < child; i++) {
                     indexInTreeRepresentation = tree.succinctTreeBpSupport.find_close(indexInTreeRepresentation) + 1;
                 }
-                nodeId = tree.succinctTreeRepresentationRank.rank(indexInTreeRepresentation);
+                nodeId = tree.succinctTreeBpSupport.rank(indexInTreeRepresentation - 1);
             }
 
             // Note that calling this on the last child renders the internal state invalid,
             // but the nodeId then still points to a DFS number one more than the size of the last child.
             void nextSibling() {
                 indexInTreeRepresentation = tree.succinctTreeBpSupport.find_close(indexInTreeRepresentation) + 1;
-                nodeId = tree.succinctTreeRepresentationRank.rank(indexInTreeRepresentation);
+                nodeId = tree.succinctTreeBpSupport.rank(indexInTreeRepresentation - 1);
             }
 
             size_t innerNodeRank() {
