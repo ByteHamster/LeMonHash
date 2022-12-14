@@ -33,7 +33,7 @@ struct GreedyChunkingStrategy : public ChunkingStrategy {
         delete mmphf;
     }
 
-    void extractChunks(std::string &string) {
+    void extractChunks(const std::string &string) {
         chunks.insert(readChunk(string.c_str(), string.length(), chunkWidth));
     }
 
@@ -48,7 +48,7 @@ struct GreedyChunkingStrategy : public ChunkingStrategy {
         chunks.rehash(0);
     }
 
-    std::string compress(std::string &string) const {
+    std::string compress(const std::string &string) const {
         StringBuilder builder;
         size_t chunkIndex = mmphf->operator()(readChunk(string.c_str(), string.length(), chunkWidth));
         builder.appendInt(chunkIndex + 1, BITS_NEEDED(mmphf->N + 1));

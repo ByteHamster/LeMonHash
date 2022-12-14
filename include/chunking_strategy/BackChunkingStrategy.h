@@ -31,7 +31,7 @@ struct BackChunkingStrategy : public ChunkingStrategy {
         delete mmphf;
     }
 
-    void extractChunks(std::string &string) {
+    void extractChunks(const std::string &string) {
         const char *str = string.c_str();
         size_t length = std::min(maxLCP + 1, string.length());
         for (size_t i = maxLCP/2; i < length; i += chunkWidth) {
@@ -50,7 +50,7 @@ struct BackChunkingStrategy : public ChunkingStrategy {
         chunks.rehash(0);
     }
 
-    std::string compress(std::string &string) const {
+    std::string compress(const std::string &string) const {
         StringBuilder builder;
         const char *str = string.c_str();
         size_t length = std::min(maxLCP + 1, string.length());
