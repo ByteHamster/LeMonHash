@@ -49,6 +49,8 @@ class RecursiveDirectRankStoringMmphf {
             }
             bucketOffsets->buildRankSelect();
             bucketOffsetsInput.clear();
+            bucketOffsetsInput.shrink_to_fit();
+            treeNodes.shrink_to_fit();
         }
     private:
         void constructNode(const auto begin, const auto end, const size_t knownCommonPrefixLength, size_t offset) {
