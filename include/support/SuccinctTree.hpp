@@ -14,14 +14,12 @@ class SuccinctTree {
 
         GrowingSdslBitVector succinctTreeRepresentation;
         sdsl::bp_support_gg<> succinctTreeBpSupport;
-        GrowingSdslBitVector nodeIsInnerNode;
-        sdsl::bit_vector::rank_1_type nodeIsInnerNodeRank;
+        sdsl::rank_support_v5<10, 2> leafNodeRank;
     public:
         SuccinctTree() = default;
 
         void openInnerNode() {
             succinctTreeRepresentation.append(OPENING_NODE);
-            nodeIsInnerNode.append(true);
         }
 
         void closeInnerNode() {
@@ -31,26 +29,22 @@ class SuccinctTree {
         void appendLeaf() {
             succinctTreeRepresentation.append(OPENING_NODE);
             succinctTreeRepresentation.append(CLOSING_NODE);
-            nodeIsInnerNode.append(false);
         }
 
         void build() {
-            nodeIsInnerNode.shrinkToFit();
-            nodeIsInnerNodeRank = sdsl::bit_vector::rank_1_type(&nodeIsInnerNode.data);
             succinctTreeRepresentation.shrinkToFit();
             succinctTreeBpSupport = sdsl::bp_support_gg<>(&succinctTreeRepresentation.data);
+            leafNodeRank = sdsl::rank_support_v5<10, 2>(&succinctTreeRepresentation.data);
         }
 
         size_t spaceBits() {
             return succinctTreeRepresentation.data.size()
-                + nodeIsInnerNode.data.size()
-                + nodeIsInnerNodeRank.bit_size()
-                + succinctTreeBpSupport.bit_size();
+                   + leafNodeRank.bit_size()
+                   + succinctTreeBpSupport.bit_size();
         }
 
         size_t spaceBitsWithoutIndices() {
-            return succinctTreeRepresentation.data.size()
-                + nodeIsInnerNode.data.size();
+            return succinctTreeRepresentation.data.size();
         }
 
         struct Reader {
@@ -61,7 +55,6 @@ class SuccinctTree {
             explicit Reader(SuccinctTree &tree) : tree(tree) {
             }
 
-            // TODO: This is possible in constant time. For now, just iterate.
             void skipToNthChild(size_t child) {
                 indexInTreeRepresentation++;
                 nodeId++;
@@ -79,7 +72,7 @@ class SuccinctTree {
             }
 
             size_t innerNodeRank() {
-                return tree.nodeIsInnerNodeRank.rank(nodeId);
+                return nodeId - tree.leafNodeRank.rank(indexInTreeRepresentation);
             }
         };
 };
