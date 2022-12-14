@@ -47,6 +47,42 @@ class SuccinctTree {
             return succinctTreeRepresentation.data.size();
         }
 
+        void toDotFile() {
+            size_t maxExpectedDepth = 35;
+            float scaleY = 200;
+            float scaleX = (maxExpectedDepth * scaleY) / (succinctTreeRepresentation.size / 2); // Try making it square
+            bool centerParentOnChildren = true;
+
+            std::cout<<"digraph {"<<std::endl;
+            std::vector<size_t> stack;
+            std::vector<size_t> childStack;
+            stack.push_back(-1);
+            childStack.push_back(0);
+            size_t dfsNum = 0;
+            for (size_t i = 0; i < succinctTreeRepresentation.data.size(); i++) {
+                if (succinctTreeRepresentation.data[i] == OPENING_NODE) {
+                    dfsNum++;
+                    if (i != 0) {
+                        std::cout<<"  "<<stack.back()<<" -> "<<dfsNum<<std::endl;
+                    }
+                    stack.push_back(dfsNum);
+                    childStack.back()++;
+                    childStack.push_back(0);
+                } else {
+                    size_t children = childStack.back();
+                    size_t endDfsNum = stack.back();
+                    std::cout<<"  "<<endDfsNum<<" [ "<<std::endl;
+                    std::cout<<"    pos = \""<<scaleX * (endDfsNum + (centerParentOnChildren ? children/2 : 0))
+                                        <<","<<scaleY * stack.size()<<"\""<<std::endl;
+                    std::cout<<"  ]"<<std::endl;
+                    stack.pop_back();
+                    childStack.pop_back();
+                    childStack.back() += children;
+                }
+            }
+            std::cout<<"}"<<std::endl;
+        }
+
         struct Reader {
             size_t indexInTreeRepresentation = 0;
             size_t nodeId = 0;
