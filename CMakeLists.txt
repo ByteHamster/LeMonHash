@@ -8,8 +8,10 @@ endif()
 add_subdirectory(extlib/util EXCLUDE_FROM_ALL)
 add_subdirectory(extlib/simpleRibbon EXCLUDE_FROM_ALL)
 
-configure_file(extlib/ds2i/succinct/succinct_config.hpp.in extlib/ds2i/succinct/succinct_config.hpp)
-configure_file(extlib/ds2i/ds2i_config.hpp.in extlib/ds2i/ds2i_config.hpp ESCAPE_QUOTES)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/extlib/ds2i/succinct/succinct_config.hpp.in
+        ${CMAKE_CURRENT_SOURCE_DIR}/extlib/ds2i/succinct/succinct_config.hpp)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/extlib/ds2i/ds2i_config.hpp.in
+        ${CMAKE_CURRENT_SOURCE_DIR}/extlib/ds2i/ds2i_config.hpp ESCAPE_QUOTES)
 add_library(ds2i INTERFACE)
 target_include_directories(ds2i SYSTEM INTERFACE extlib/ds2i)
 
