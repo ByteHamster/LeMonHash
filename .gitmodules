@@ -4,3 +4,6 @@
 [submodule "extlib/simpleRibbon"]
 	path = extlib/simpleRibbon
 	url = git@github.com:ByteHamster/SimpleRibbon.git
+[submodule "extlib/ds2i"]
+	path = extlib/ds2i
+	url = git@github.com:ByteHamster-etc/ds2i.git

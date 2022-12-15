@@ -8,10 +8,13 @@ endif()
 add_subdirectory(extlib/util EXCLUDE_FROM_ALL)
 add_subdirectory(extlib/simpleRibbon EXCLUDE_FROM_ALL)
 
+add_library(ds2i INTERFACE)
+target_include_directories(ds2i SYSTEM INTERFACE extlib/ds2i)
+
 add_library(DirectRankStoring INTERFACE)
 target_compile_features(DirectRankStoring INTERFACE cxx_std_20)
 target_include_directories(DirectRankStoring INTERFACE include)
-target_link_libraries(DirectRankStoring INTERFACE SimpleRibbon ByteHamsterUtil)
+target_link_libraries(DirectRankStoring INTERFACE SimpleRibbon ByteHamsterUtil ds2i)
 
 # Do not create benchmark targets when this is a subdirectory
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
