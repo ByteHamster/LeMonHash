@@ -105,7 +105,7 @@ public:
                 std::tie(y0, y1, y2) = get_ys(segment_i);
             }
             auto eval = evaluate(*it - first_key, x0, x1, y0, y1);
-            auto pos = std::min<size_t>(eval > 0 ? size_t(eval) : 0ull, y2);
+            auto pos = std::min<size_t>(eval > 0 ? size_t(eval) : 0ull, y2 - 1);
             assert(std::abs(int64_t(pos) - int64_t(std::distance(first, it))) <= epsilon + 1);
             f(it, pos);
             ++it;
@@ -117,7 +117,7 @@ public:
         auto [point_index, x0, x1] = segment_for_key(k - first_key);
         auto [y0, y1, y2] = get_ys(point_index);
         auto eval = evaluate(k - first_key, x0, x1, y0, y1);
-        auto pos = std::min<size_t>(eval > 0 ? size_t(eval) : 0ull, y2);
+        auto pos = std::min<size_t>(eval > 0 ? size_t(eval) : 0ull, y2 - 1);
         return pos;
     }
 
