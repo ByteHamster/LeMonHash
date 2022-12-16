@@ -91,7 +91,7 @@ struct SuccinctPgmBucketMapper {
     }
 
     [[nodiscard]] size_t size() const {
-        return sizeof(*this) + (usesPgmIndex ? sizeof(*pgmIndex) + pgmIndex->size_in_bytes() : 0);
+        return sizeof(*this) + (usesPgmIndex ? pgmIndex->size_in_bytes() : 0);
     }
 
     [[nodiscard]] size_t numBuckets() const {

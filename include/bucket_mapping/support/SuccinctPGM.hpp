@@ -131,7 +131,9 @@ public:
      * Returns the size of the index in bytes.
      * @return the size of the index in bytes
      */
-    [[nodiscard]] size_t size_in_bytes() const { return xs->space() + ys->space() + sdsl::size_in_bytes(yshifts); }
+    [[nodiscard]] size_t size_in_bytes() const {
+        return sizeof(*this) + xs->space() + ys->space() + sdsl::size_in_bytes(yshifts);
+    }
 
     [[nodiscard]] size_t epsilon_value() const { return epsilon; }
 
