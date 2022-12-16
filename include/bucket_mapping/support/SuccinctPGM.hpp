@@ -6,13 +6,14 @@
 
 namespace pgm {
 
+#pragma pack(push, 1)
+
 template<typename K>
 class SuccinctPGMIndex {
 protected:
     using xs_type = util::EliasFanoM;
     using ys_type = util::EliasFanoM;
 
-    size_t n;
     uint16_t epsilon;
     K first_key;
     xs_type *xs;
@@ -32,9 +33,9 @@ public:
      */
     template<typename RandomIt>
     SuccinctPGMIndex(RandomIt first, RandomIt last, uint16_t epsilon)
-        : n(std::distance(first, last)),
-          epsilon(epsilon),
-          first_key(n ? *first : K(0))  {
+        : epsilon(epsilon),
+          first_key(std::distance(first, last) ? *first : K(0))  {
+        auto n = (size_t) std::distance(first, last);
         if (n == 0)
             return;
 
@@ -174,5 +175,7 @@ private:
         return {*p, *np};
     }
 };
+
+#pragma pack(pop)
 
 }
