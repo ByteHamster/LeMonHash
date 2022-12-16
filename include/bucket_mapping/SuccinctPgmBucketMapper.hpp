@@ -7,52 +7,94 @@
 /**
  * Uses a succinct version of the PGM Index to get an approximate rank, which we use as bucket index.
  */
-struct SuccinctPgmBucketMapper : public BucketMapper {
-    pgm::SuccinctPGMIndex<uint64_t> *pgmIndex = nullptr;
-    size_t numBuckets_;
+struct SuccinctPgmBucketMapper {
+    union {
+        pgm::SuccinctPGMIndex<uint64_t> *pgmIndex = nullptr;
+        uint64_t uOverN;
+    };
+    size_t numBuckets_ : 63;
+    bool usesPgmIndex : 1;
+
+    SuccinctPgmBucketMapper() = default;
 
     template<typename RandomIt>
     SuccinctPgmBucketMapper(RandomIt begin, RandomIt end) {
-        auto best_space = std::numeric_limits<size_t>::max();
+        auto n = (uint64_t) std::distance(begin, end);
+        auto bestCost = std::numeric_limits<size_t>::max();
+
+        size_t cost;
+        size_t previousBucket;
+        RandomIt bucketBegin;
+        auto updateCost = [&](auto it, size_t bucket) {
+            if (bucket != previousBucket) {
+                auto bucketSize = std::distance(bucketBegin, it);
+                cost += bucketSize <= 1 ? 0 : bucketSize * BIT_WIDTH(bucketSize - 1);
+                previousBucket = bucket;
+                bucketBegin = it;
+            }
+        };
 
         for (auto epsilon : {3, 7, 15, 31, 63}) {
             auto *pgm = new pgm::SuccinctPGMIndex<uint64_t>(begin, end, epsilon);
 
-            std::vector<size_t> bucket_sizes(std::distance(begin, end) + 1);
-            pgm->for_each(begin, end, [&] (auto, auto approx_rank) {
-                ++bucket_sizes[approx_rank];
-            });
+            cost = pgm->size_in_bytes() * 8;
+            previousBucket = 0;
+            bucketBegin = begin;
+            pgm->for_each(begin, end, updateCost);
+            updateCost(end, 0);
 
-            size_t ranks_bits = 0;
-            for (auto b: bucket_sizes)
-                ranks_bits += b <= 1 ? 0ull : b * BIT_WIDTH(b - 1);
-
-            auto space = pgm->size_in_bytes() + ranks_bits / 8;
-            if (space < best_space) {
+            if (cost < bestCost) {
                 delete pgmIndex;
                 pgmIndex = pgm;
-                best_space = space;
+                bestCost = cost;
             } else {
                 delete pgm;
             }
         }
 
-        numBuckets_ = bucketOf(*std::prev(end)) + 1;
+        // Evaluate if linear mapper is better
+        auto tmpUOverN = *(end - 1) / (n - 1);
+        cost = 0;
+        previousBucket = 0;
+        bucketBegin = begin;
+        for (auto it = begin; it != end; ++it)
+            updateCost(it, linearMapper(*it, n, tmpUOverN));
+        updateCost(end, 0);
+
+        if (cost < bestCost) {
+            delete pgmIndex;
+            usesPgmIndex = false;
+            uOverN = tmpUOverN;
+            numBuckets_ = n;
+        } else {
+            usesPgmIndex = true;
+            numBuckets_ = bucketOf(*std::prev(end)) + 1;
+        }
     }
 
-    [[nodiscard]] size_t bucketOf(uint64_t key) const final {
-        return pgmIndex->approximate_rank(key);
+    [[nodiscard]] size_t bucketOf(uint64_t key) const  {
+        if (usesPgmIndex)
+            return pgmIndex->approximate_rank(key);
+        return linearMapper(key, numBuckets_, uOverN);
     }
 
-    void bucketOf(Iterator first, Iterator last, Func f) const final {
-        pgmIndex->for_each(first, last, f);
+    template<typename Iterator, typename Func>
+    void bucketOf(Iterator first, Iterator last, Func f) const {
+        if (usesPgmIndex) {
+            pgmIndex->for_each(first, last, f);
+        } else {
+            while (first != last) {
+                f(first, bucketOf(*first));
+                ++first;
+            }
+        }
     }
 
-    [[nodiscard]] size_t size() const final {
-        return sizeof(*this) + sizeof(*pgmIndex) + pgmIndex->size_in_bytes();
+    [[nodiscard]] size_t size() const {
+        return sizeof(*this) + (usesPgmIndex ? sizeof(*pgmIndex) + pgmIndex->size_in_bytes() : 0);
     }
 
-    [[nodiscard]] size_t numBuckets() const final {
+    [[nodiscard]] size_t numBuckets() const {
         return numBuckets_;
     }
 
@@ -65,10 +107,19 @@ struct SuccinctPgmBucketMapper : public BucketMapper {
     }
 
     [[nodiscard]] std::string info() const {
-        return "epsilon=" + std::to_string(pgmIndex->epsilon_value());
+        if (usesPgmIndex)
+            return "epsilon=" + std::to_string(pgmIndex->epsilon_value());
+        return "u/n=" + std::to_string(uOverN);
     }
 
-    ~SuccinctPgmBucketMapper() override {
-        delete pgmIndex;
+    ~SuccinctPgmBucketMapper() {
+        if (usesPgmIndex)
+            delete pgmIndex;
+    }
+
+private:
+
+    [[nodiscard]] size_t linearMapper(uint64_t key, size_t numBuckets, uint64_t uOverN) const {
+        return std::min(numBuckets - 1, key / uOverN);
     }
 };
