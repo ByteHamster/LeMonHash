@@ -1,6 +1,7 @@
 #pragma once
 
 #include <SimpleRibbon.h>
+#include <MurmurHash64.h>
 #include "chunking_strategy/support/util.h"
 
 /**
@@ -66,6 +67,10 @@ class MultiRetrievalDataStructure {
             } else {
                 retrieval13PlusInput.emplace_back(std::make_pair(key, value));
             }
+        }
+
+        void addInput(size_t range, std::string &key, uint32_t value) {
+            addInput(range, util::MurmurHash64(key), value);
         }
 
         void build() {
@@ -140,6 +145,10 @@ class MultiRetrievalDataStructure {
             } else {
                 return retrieval13Plus->retrieve(key);
             }
+        }
+
+        size_t query(size_t range, std::string &key) {
+            return query(range, util::MurmurHash64(key));
         }
 
         ~MultiRetrievalDataStructure() {
