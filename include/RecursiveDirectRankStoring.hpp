@@ -4,11 +4,11 @@
 #include <string>
 #include <unordered_set>
 #include <algorithm>
+#include <fstream>
 #include "bucket_mapping/SuccinctPgmBucketMapper.hpp"
 #include "DirectRankStoring.hpp"
 #include "bucket_mapping/support/EliasFanoModified.hpp"
 #include <MurmurHash64.h>
-#include "support/SuccinctTree.hpp"
 #include "support/PartitionedEliasFano.hpp"
 
 /**
@@ -48,6 +48,10 @@ class RecursiveDirectRankStoringMmphf {
             }
             bucketOffsetsInput.clear();
             bucketOffsetsInput.shrink_to_fit();
+
+            //std::ofstream myfile("tree.dot");
+            //exportTreeStructure(myfile);
+            //myfile.close();
         }
     private:
         void constructNode(const auto begin, const auto end, const size_t knownCommonPrefixLength,
@@ -181,6 +185,43 @@ class RecursiveDirectRankStoringMmphf {
                         + 3 * treeNodes.size(); // Use an MPHF instead of std::unordered_map
         }
 
+        void exportTreeStructure(std::ostream &os) {
+            os<<"digraph {"<<std::endl;
+            exportTreeStructureInternal(os, PATH_ROOT, 0);
+            os<<"}"<<std::endl;
+        }
+
+        void exportTreeStructureInternal(std::ostream &os, std::string path, size_t layer) {
+            float scaleY = 200;
+            float scaleX = 1.6 * (bucketOffsets.size() * scaleY) / N;
+
+            TreeNode node = treeNodes.at(path);
+            size_t beginX = bucketOffsets.at(layer)->at(node.offsetsOffset);
+            size_t endX = bucketOffsets.at(layer)->at(node.offsetsOffset + node.bucketMapper->numBuckets());
+            os<<"  \""<<path<<"\" [ "<<std::endl;
+            os<<"    pos = \""<<+scaleX*(beginX+endX)/2<<","<<scaleY*layer<<"\""<<std::endl;
+            os<<"    layer = \""<<+layer<<"\""<<std::endl;
+            os<<"    label = \""<<+(endX - beginX)<<"\""<<std::endl;
+            os<<"    usesPgm = \""<<+node.bucketMapper->usesPgmIndex<<"\""<<std::endl;
+            os<<"  ]"<<std::endl;
+
+            for (size_t i = 0; i < node.bucketMapper->numBuckets(); i++) {
+                std::string childPath = path + "/" + std::to_string(i);
+                os<<"  \""<<path<<"\" -> \""<<childPath<<"\""<<std::endl;
+                size_t childBegin = bucketOffsets.at(layer)->at(node.offsetsOffset + i);
+                size_t childSize = bucketOffsets.at(layer)->at(node.offsetsOffset + i + 1) - childBegin;
+                if (childSize < DIRECT_RANK_STORING_THRESHOLD) {
+                    os<<"  \""<<childPath<<"\" [ "<<std::endl;
+                    os<<"    pos = \""<<+scaleX*childBegin<<","<<scaleY*(layer+1)<<"\""<<std::endl;
+                    os<<"    layer = \""<<+(layer+1)<<"\""<<std::endl;
+                    os<<"    label = \""<<+childSize<<"\""<<std::endl;
+                    os<<"  ]"<<std::endl;
+                } else {
+                    exportTreeStructureInternal(os, childPath, layer + 1);
+                }
+            }
+        }
+
         uint64_t operator ()(const std::string &string) {
             std::string path = PATH_ROOT;
             TreeNode node = treeNodes.at(path);
@@ -259,6 +300,10 @@ class RecursiveDirectRankStoringV2Mmphf {
             }
             bucketOffsetsInput.clear();
             bucketOffsetsInput.shrink_to_fit();
+
+            //std::ofstream myfile("tree2.dot");
+            //exportTreeStructure(myfile);
+            //myfile.close();
         }
     private:
         void constructNode(const auto begin, const auto end, const auto lcpsBegin, const auto lcpsEnd,
@@ -376,6 +421,43 @@ class RecursiveDirectRankStoringV2Mmphf {
                         + 8 * std::accumulate(treeNodes.begin(), treeNodes.end(), 0,
                                   [] (size_t size, auto &node) { return size + node.second.bucketMapper->size(); })
                         + 3 * treeNodes.size(); // Use an MPHF instead of std::unordered_map
+        }
+
+        void exportTreeStructure(std::ostream &os) {
+            os<<"digraph {"<<std::endl;
+            exportTreeStructureInternal(os, PATH_ROOT, 0);
+            os<<"}"<<std::endl;
+        }
+
+        void exportTreeStructureInternal(std::ostream &os, std::string path, size_t layer) {
+            float scaleY = 200;
+            float scaleX = 1.6 * (bucketOffsets.size() * scaleY) / N;
+
+            TreeNode node = treeNodes.at(path);
+            size_t beginX = bucketOffsets.at(layer)->at(node.offsetsOffset);
+            size_t endX = bucketOffsets.at(layer)->at(node.offsetsOffset + node.bucketMapper->numBuckets());
+            os<<"  \""<<path<<"\" [ "<<std::endl;
+            os<<"    pos = \""<<+scaleX*(beginX+endX)/2<<","<<scaleY*layer<<"\""<<std::endl;
+            os<<"    layer = \""<<+layer<<"\""<<std::endl;
+            os<<"    label = \""<<+(endX - beginX)<<"\""<<std::endl;
+            os<<"    usesPgm = \""<<+node.bucketMapper->usesPgmIndex<<"\""<<std::endl;
+            os<<"  ]"<<std::endl;
+
+            for (size_t i = 0; i < node.bucketMapper->numBuckets(); i++) {
+                std::string childPath = path + "/" + std::to_string(i);
+                os<<"  \""<<path<<"\" -> \""<<childPath<<"\""<<std::endl;
+                size_t childBegin = bucketOffsets.at(layer)->at(node.offsetsOffset + i);
+                size_t childSize = bucketOffsets.at(layer)->at(node.offsetsOffset + i + 1) - childBegin;
+                if (childSize < DIRECT_RANK_STORING_THRESHOLD) {
+                    os<<"  \""<<childPath<<"\" [ "<<std::endl;
+                    os<<"    pos = \""<<+scaleX*childBegin<<","<<scaleY*(layer+1)<<"\""<<std::endl;
+                    os<<"    layer = \""<<+(layer+1)<<"\""<<std::endl;
+                    os<<"    label = \""<<+childSize<<"\""<<std::endl;
+                    os<<"  ]"<<std::endl;
+                } else {
+                    exportTreeStructureInternal(os, childPath, layer + 1);
+                }
+            }
         }
 
         uint64_t operator ()(const std::string &string) {
