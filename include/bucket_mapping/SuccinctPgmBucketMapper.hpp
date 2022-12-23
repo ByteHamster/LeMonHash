@@ -9,7 +9,7 @@
  */
 struct SuccinctPgmBucketMapper {
     union {
-        pgm::SuccinctPGMIndex<uint64_t> *pgmIndex = nullptr;
+        pgm::SuccinctPGMIndex *pgmIndex = nullptr;
         uint64_t uOverN;
     };
     size_t numBuckets_ : 63;
@@ -35,7 +35,7 @@ struct SuccinctPgmBucketMapper {
         };
 
         for (auto epsilon : {3, 7, 15, 31, 63}) {
-            auto *pgm = new pgm::SuccinctPGMIndex<uint64_t>(begin, end, epsilon);
+            auto *pgm = new pgm::SuccinctPGMIndex(begin, end, epsilon);
 
             cost = pgm->size_in_bytes() * 8;
             previousBucket = 0;
