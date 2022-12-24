@@ -45,6 +45,7 @@ class RecursiveDirectRankStoringMmphf {
 
         MultiRetrievalDataStructure retrieval;
         size_t N = 0;
+        size_t height = 0;
         std::unordered_map<std::string, TreeNode> treeNodes; // TODO: Use perfect hashing
         std::vector<PartitionedEliasFano *> bucketOffsets;
         std::vector<std::vector<size_t>> bucketOffsetsInput;
@@ -58,6 +59,7 @@ class RecursiveDirectRankStoringMmphf {
                 auto *fano = new PartitionedEliasFano(v);
                 bucketOffsets.push_back(fano);
             }
+            height = bucketOffsetsInput.size();
             bucketOffsetsInput.clear();
             bucketOffsetsInput.shrink_to_fit();
 
@@ -212,6 +214,7 @@ class RecursiveDirectRankStoringMmphf {
             std::cout<<"Bucket offsets:      "<<1.0 * std::accumulate(bucketOffsets.begin(), bucketOffsets.end(), 0,
                                  [] (size_t size, PartitionedEliasFano *fano) { return size + fano->bit_size(); }) / N<<std::endl;
             std::cout<<"Tree node data:      "<<(8.0 * treeNodes.size() * sizeof(TreeNode) + 3.0 * treeNodes.size())/N<<std::endl;
+            std::cout<<"Height:              "<<height<<std::endl;
 
             return retrieval.spaceBits()
                         + 8 * (sizeof(*this)
@@ -337,6 +340,7 @@ class RecursiveDirectRankStoringV2Mmphf {
 
         MultiRetrievalDataStructure retrieval;
         size_t N = 0;
+        size_t height = 0;
         std::unordered_map<std::string, TreeNode> treeNodes; // TODO: Use perfect hashing
         std::vector<PartitionedEliasFano *> bucketOffsets;
         std::vector<std::vector<size_t>> bucketOffsetsInput;
@@ -351,6 +355,7 @@ class RecursiveDirectRankStoringV2Mmphf {
                 auto *fano = new PartitionedEliasFano(v);
                 bucketOffsets.push_back(fano);
             }
+            height = bucketOffsets.size();
             bucketOffsetsInput.clear();
             bucketOffsetsInput.shrink_to_fit();
 
@@ -493,6 +498,7 @@ class RecursiveDirectRankStoringV2Mmphf {
             std::cout<<"Bucket offsets:      "<<1.0 * std::accumulate(bucketOffsets.begin(), bucketOffsets.end(), 0,
                                  [] (size_t size, PartitionedEliasFano *fano) { return size + fano->bit_size(); }) / N<<std::endl;
             std::cout<<"Tree node data:      "<<(8.0 * treeNodes.size() * sizeof(TreeNode) + 3.0 * treeNodes.size())/N<<std::endl;
+            std::cout<<"Height:              "<<height<<std::endl;
 
             return retrieval.spaceBits()
                         + 8 * (sizeof(*this)
