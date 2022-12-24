@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <fstream>
 #include "bucket_mapping/SuccinctPgmBucketMapper.hpp"
+#include "bucket_mapping/ShortPgmBucketMapper.hpp"
 #include "DirectRankStoring.hpp"
 #include "bucket_mapping/support/EliasFanoModified.hpp"
 #include <MurmurHash64.h>
@@ -34,7 +35,7 @@ class RecursiveDirectRankStoringMmphf {
 
         struct TreeNode {
             union {
-                SuccinctPgmBucketMapper *bucketMapper = nullptr;
+                ShortPgmBucketMapper *bucketMapper = nullptr;
                 size_t numChildren;
             };
             size_t offsetsOffset : 48 = 0;
@@ -100,7 +101,7 @@ class RecursiveDirectRankStoringMmphf {
                 }
             } else {
                 treeNode.directRankStoring = false;
-                treeNode.bucketMapper = new SuccinctPgmBucketMapper(chunks.begin(), chunks.end());
+                treeNode.bucketMapper = new ShortPgmBucketMapper(chunks.begin(), chunks.end());
                 size_t numBuckets = treeNode.bucketMapper->numBuckets();
                 assert(numBuckets >= 2);
 
@@ -240,7 +241,6 @@ class RecursiveDirectRankStoringMmphf {
             os<<"    pos = \""<<+scaleX*(beginX+endX)/2<<","<<scaleY*layer<<"\""<<std::endl;
             os<<"    layer = \""<<+layer<<"\""<<std::endl;
             os<<"    label = \""<<+(endX - beginX)<<"\""<<std::endl;
-            os<<"    usesPgm = \""<<+node.bucketMapper->usesPgmIndex<<"\""<<std::endl;
             os<<"  ]"<<std::endl;
 
             for (size_t i = 0; i < node.bucketMapper->numBuckets(); i++) {
