@@ -6,7 +6,7 @@
 #include <algorithm>
 #include <fstream>
 #include "bucket_mapping/SuccinctPgmBucketMapper.hpp"
-#include "bucket_mapping/ShortPgmBucketMapper.hpp"
+#include "bucket_mapping/UnalignedPgmBucketMapper.hpp"
 #include "DirectRankStoring.hpp"
 #include "bucket_mapping/support/EliasFanoModified.hpp"
 #include <MurmurHash64.h>
@@ -35,7 +35,7 @@ class RecursiveDirectRankStoringMmphf {
 
         struct TreeNode {
             union {
-                ShortPgmBucketMapper *bucketMapper = nullptr;
+                UnalignedPgmBucketMapper *bucketMapper = nullptr;
                 size_t numChildren;
             };
             size_t offsetsOffset : 48 = 0;
@@ -101,7 +101,7 @@ class RecursiveDirectRankStoringMmphf {
                 }
             } else {
                 treeNode.directRankStoring = false;
-                treeNode.bucketMapper = new ShortPgmBucketMapper(chunks.begin(), chunks.end());
+                treeNode.bucketMapper = new UnalignedPgmBucketMapper(chunks.begin(), chunks.end());
                 size_t numBuckets = treeNode.bucketMapper->numBuckets();
                 assert(numBuckets >= 2);
 
@@ -308,7 +308,7 @@ class RecursiveDirectRankStoringV2Mmphf {
         struct TreeNode {
             using index_type = uint16_t;
             union {
-                ShortPgmBucketMapper *bucketMapper = nullptr;
+                UnalignedPgmBucketMapper *bucketMapper = nullptr;
                 size_t numChildren;
             };
             bool directRankStoring : 1 = false;
@@ -399,7 +399,7 @@ class RecursiveDirectRankStoringV2Mmphf {
                 }
             } else {
                 treeNode.directRankStoring = false;
-                treeNode.bucketMapper = new ShortPgmBucketMapper(chunks.begin(), chunks.end());
+                treeNode.bucketMapper = new UnalignedPgmBucketMapper(chunks.begin(), chunks.end());
                 assert(treeNode.bucketMapper->numBuckets() >= 2);
 
                 auto it = begin;
