@@ -45,7 +45,6 @@ class RecursiveDirectRankStoringMmphf {
 
         MultiRetrievalDataStructure retrieval;
         size_t N = 0;
-        size_t height = 0;
         std::unordered_map<std::string, TreeNode> treeNodes; // TODO: Use perfect hashing
         std::vector<PartitionedEliasFano *> bucketOffsets;
         std::vector<std::vector<size_t>> bucketOffsetsInput;
@@ -59,7 +58,6 @@ class RecursiveDirectRankStoringMmphf {
                 auto *fano = new PartitionedEliasFano(v);
                 bucketOffsets.push_back(fano);
             }
-            height = bucketOffsetsInput.size();
             bucketOffsetsInput.clear();
             bucketOffsetsInput.shrink_to_fit();
 
@@ -214,7 +212,7 @@ class RecursiveDirectRankStoringMmphf {
             std::cout<<"Bucket offsets:      "<<1.0 * std::accumulate(bucketOffsets.begin(), bucketOffsets.end(), 0,
                                  [] (size_t size, PartitionedEliasFano *fano) { return size + fano->bit_size(); }) / N<<std::endl;
             std::cout<<"Tree node data:      "<<(8.0 * treeNodes.size() * sizeof(TreeNode) + 3.0 * treeNodes.size())/N<<std::endl;
-            std::cout<<"Height:              "<<height<<std::endl;
+            std::cout<<"Height:              "<<bucketOffsets.size()<<std::endl;
 
             return retrieval.spaceBits()
                         + 8 * (sizeof(*this)
@@ -239,14 +237,15 @@ class RecursiveDirectRankStoringMmphf {
 
             TreeNode node = treeNodes.at(path);
             size_t beginX = bucketOffsets.at(layer)->at(node.offsetsOffset);
-            size_t endX = bucketOffsets.at(layer)->at(node.offsetsOffset + node.bucketMapper->numBuckets());
+            size_t nodeSize = node.directRankStoring ? node.numChildren : node.bucketMapper->numBuckets();
+            size_t endX = bucketOffsets.at(layer)->at(node.offsetsOffset + nodeSize);
             os<<"  \""<<path<<"\" [ "<<std::endl;
             os<<"    pos = \""<<+scaleX*(beginX+endX)/2<<","<<scaleY*layer<<"\""<<std::endl;
             os<<"    layer = \""<<+layer<<"\""<<std::endl;
             os<<"    label = \""<<+(endX - beginX)<<"\""<<std::endl;
             os<<"  ]"<<std::endl;
 
-            for (size_t i = 0; i < node.bucketMapper->numBuckets(); i++) {
+            for (size_t i = 0; i < nodeSize; i++) {
                 std::string childPath = path + "/" + std::to_string(i);
                 os<<"  \""<<path<<"\" -> \""<<childPath<<"\""<<std::endl;
                 size_t childBegin = bucketOffsets.at(layer)->at(node.offsetsOffset + i);
@@ -340,7 +339,6 @@ class RecursiveDirectRankStoringV2Mmphf {
 
         MultiRetrievalDataStructure retrieval;
         size_t N = 0;
-        size_t height = 0;
         std::unordered_map<std::string, TreeNode> treeNodes; // TODO: Use perfect hashing
         std::vector<PartitionedEliasFano *> bucketOffsets;
         std::vector<std::vector<size_t>> bucketOffsetsInput;
@@ -355,7 +353,6 @@ class RecursiveDirectRankStoringV2Mmphf {
                 auto *fano = new PartitionedEliasFano(v);
                 bucketOffsets.push_back(fano);
             }
-            height = bucketOffsets.size();
             bucketOffsetsInput.clear();
             bucketOffsetsInput.shrink_to_fit();
 
@@ -498,7 +495,7 @@ class RecursiveDirectRankStoringV2Mmphf {
             std::cout<<"Bucket offsets:      "<<1.0 * std::accumulate(bucketOffsets.begin(), bucketOffsets.end(), 0,
                                  [] (size_t size, PartitionedEliasFano *fano) { return size + fano->bit_size(); }) / N<<std::endl;
             std::cout<<"Tree node data:      "<<(8.0 * treeNodes.size() * sizeof(TreeNode) + 3.0 * treeNodes.size())/N<<std::endl;
-            std::cout<<"Height:              "<<height<<std::endl;
+            std::cout<<"Height:              "<<bucketOffsets.size()<<std::endl;
 
             return retrieval.spaceBits()
                         + 8 * (sizeof(*this)
@@ -523,14 +520,15 @@ class RecursiveDirectRankStoringV2Mmphf {
 
             TreeNode node = treeNodes.at(path);
             size_t beginX = bucketOffsets.at(layer)->at(node.offsetsOffset);
-            size_t endX = bucketOffsets.at(layer)->at(node.offsetsOffset + node.bucketMapper->numBuckets());
+            size_t nodeSize = node.directRankStoring ? node.numChildren : node.bucketMapper->numBuckets();
+            size_t endX = bucketOffsets.at(layer)->at(node.offsetsOffset + nodeSize);
             os<<"  \""<<path<<"\" [ "<<std::endl;
             os<<"    pos = \""<<+scaleX*(beginX+endX)/2<<","<<scaleY*layer<<"\""<<std::endl;
             os<<"    layer = \""<<+layer<<"\""<<std::endl;
             os<<"    label = \""<<+(endX - beginX)<<"\""<<std::endl;
             os<<"  ]"<<std::endl;
 
-            for (size_t i = 0; i < node.bucketMapper->numBuckets(); i++) {
+            for (size_t i = 0; i < nodeSize; i++) {
                 std::string childPath = path + "/" + std::to_string(i);
                 os<<"  \""<<path<<"\" -> \""<<childPath<<"\""<<std::endl;
                 size_t childBegin = bucketOffsets.at(layer)->at(node.offsetsOffset + i);
