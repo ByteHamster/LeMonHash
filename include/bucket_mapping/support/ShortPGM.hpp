@@ -53,6 +53,9 @@ struct Segment {
 template<size_t Capacity=0>
 class ShortPGMIndex {
     static constexpr size_t max_local_capacity = 15;
+    static constexpr uint8_t type_bit_width = BIT_WIDTH(max_local_capacity);
+    static constexpr auto align_val = std::align_val_t(std::max<size_t>(__STDCPP_DEFAULT_NEW_ALIGNMENT__,
+                                                                        1ull << type_bit_width));
 
     struct Local {
         Segment segments[Capacity];
@@ -71,7 +74,12 @@ class ShortPGMIndex {
         Segment *segments;
 
         Heap(size_t size) : segments_size(size), segments(new Segment[size]) {}
+        Heap(const Heap &) = delete;
+        Heap(Heap&&) = delete;
+        Heap& operator=(const Heap &) = delete;
+        Heap& operator=(Heap &&) = delete;
         ~Heap() { delete[] segments; }
+
         auto begin() const { return segments; }
         auto end() const { return segments + segments_size; }
         auto size() const { return segments_size; }
@@ -85,7 +93,7 @@ class ShortPGMIndex {
     using K = uint64_t;
     using Storage = std::conditional_t<(Capacity == 0 || Capacity > max_local_capacity), Heap, Local>;
     Storage segments;
-    uint8_t epsilon;
+    uint32_t n;
 
 public:
 
@@ -94,42 +102,104 @@ public:
     using capacities_sequence = std::make_index_sequence<max_local_capacity + 1>;
     using all_types = decltype(to_tuple_helper(capacities_sequence{}));
 
-    static std::pair<void *, size_t> make(auto first, auto last, uint8_t epsilon) {
-        return make_helper(first, last, epsilon, capacities_sequence{});
-    }
+    class Holder {
+        uint64_t ptr : 64 - type_bit_width;
+        size_t type : type_bit_width;
 
-    template <typename F>
-    static void visit(F f, void *ptr, size_t type) {
-        switch (type) {
-            case 0:  f(static_cast<std::tuple_element_t<0,  all_types>*>(ptr)); break;
-            case 1:  f(static_cast<std::tuple_element_t<1,  all_types>*>(ptr)); break;
-            case 2:  f(static_cast<std::tuple_element_t<2,  all_types>*>(ptr)); break;
-            case 3:  f(static_cast<std::tuple_element_t<3,  all_types>*>(ptr)); break;
-            case 4:  f(static_cast<std::tuple_element_t<4,  all_types>*>(ptr)); break;
-            case 5:  f(static_cast<std::tuple_element_t<5,  all_types>*>(ptr)); break;
-            case 6:  f(static_cast<std::tuple_element_t<6,  all_types>*>(ptr)); break;
-            case 7:  f(static_cast<std::tuple_element_t<7,  all_types>*>(ptr)); break;
-            case 8:  f(static_cast<std::tuple_element_t<8,  all_types>*>(ptr)); break;
-            case 9:  f(static_cast<std::tuple_element_t<9,  all_types>*>(ptr)); break;
-            case 10: f(static_cast<std::tuple_element_t<10, all_types>*>(ptr)); break;
-            case 11: f(static_cast<std::tuple_element_t<11, all_types>*>(ptr)); break;
-            case 12: f(static_cast<std::tuple_element_t<12, all_types>*>(ptr)); break;
-            case 13: f(static_cast<std::tuple_element_t<13, all_types>*>(ptr)); break;
-            case 14: f(static_cast<std::tuple_element_t<14, all_types>*>(ptr)); break;
-            case 15: f(static_cast<std::tuple_element_t<15, all_types>*>(ptr)); break;
-            default: f(static_cast<ShortPGMIndex<>*>(ptr));
+        template <typename F>
+        void visit(F f) const {
+            auto p = ptr << type_bit_width;
+            switch (type) {
+                case 0:  f(reinterpret_cast<std::tuple_element_t<0,  all_types>*>(p)); break;
+                case 1:  f(reinterpret_cast<std::tuple_element_t<1,  all_types>*>(p)); break;
+                case 2:  f(reinterpret_cast<std::tuple_element_t<2,  all_types>*>(p)); break;
+                case 3:  f(reinterpret_cast<std::tuple_element_t<3,  all_types>*>(p)); break;
+                case 4:  f(reinterpret_cast<std::tuple_element_t<4,  all_types>*>(p)); break;
+                case 5:  f(reinterpret_cast<std::tuple_element_t<5,  all_types>*>(p)); break;
+                case 6:  f(reinterpret_cast<std::tuple_element_t<6,  all_types>*>(p)); break;
+                case 7:  f(reinterpret_cast<std::tuple_element_t<7,  all_types>*>(p)); break;
+                case 8:  f(reinterpret_cast<std::tuple_element_t<8,  all_types>*>(p)); break;
+                case 9:  f(reinterpret_cast<std::tuple_element_t<9,  all_types>*>(p)); break;
+                case 10: f(reinterpret_cast<std::tuple_element_t<10, all_types>*>(p)); break;
+                case 11: f(reinterpret_cast<std::tuple_element_t<11, all_types>*>(p)); break;
+                case 12: f(reinterpret_cast<std::tuple_element_t<12, all_types>*>(p)); break;
+                case 13: f(reinterpret_cast<std::tuple_element_t<13, all_types>*>(p)); break;
+                case 14: f(reinterpret_cast<std::tuple_element_t<14, all_types>*>(p)); break;
+                case 15: f(reinterpret_cast<std::tuple_element_t<15, all_types>*>(p)); break;
+                default: f(reinterpret_cast<ShortPGMIndex<>*>(p));
+            }
         }
+
+        template <typename F>
+        void visit(F f) { const_cast<const Holder*>(this)->visit(f); }
+
+    public:
+
+        Holder() : ptr(0), type(0) {}
+        Holder(void *ptr, size_t type) : ptr(reinterpret_cast<uint64_t>(ptr) >> type_bit_width), type(type) {}
+        Holder(const Holder&) = delete;
+        Holder& operator=(const Holder &) = delete;
+        Holder(Holder&&) = delete;
+
+        Holder& operator=(Holder &&other) {
+            if (this != &other) {
+                if (ptr != 0 && type != 0)
+                    visit([](auto index) { operator delete (index, align_val); });
+
+                ptr = other.ptr;
+                type = other.type;
+
+                other.ptr = 0;
+                other.type = 0;
+            }
+            return *this;
+        };
+
+        [[nodiscard]] size_t approximate_rank(const K &key) const {
+            size_t rank = 0;
+            visit([&](const auto index) { rank = index->approximate_rank(key); });
+            return rank;
+        }
+
+        template<typename ForwardIt, typename F>
+        void for_each(ForwardIt first, ForwardIt last, F f) const {
+            visit([&](const auto index) { index->for_each(first, last, f); });
+        }
+
+        [[nodiscard]] size_t size() const {
+            size_t size = 0;
+            visit([&](const auto index) { size = index->size(); });
+            return size;
+        }
+
+        [[nodiscard]] size_t size_in_bytes() const {
+            size_t bytes = sizeof(*this);
+            visit([&](const auto index) { bytes += index->size_in_bytes(); });
+            return bytes;
+        }
+
+        ~Holder() {
+            if (ptr != 0 && type != 0) {
+                visit([](auto index) { operator delete (index, align_val); });
+                ptr = 0;
+                type = 0;
+            }
+        }
+    };
+
+    static Holder make(auto first, auto last, uint8_t epsilon) {
+        return make_helper(first, last, epsilon, capacities_sequence{});
     }
 
     ShortPGMIndex() = default;
 
-    ShortPGMIndex(const std::vector<Segment> &s, uint8_t epsilon) : segments(s.size()), epsilon(epsilon) {
+    ShortPGMIndex(const std::vector<Segment> &s, const size_t n) : segments(s.size()), n(n) {
         assert(s.size() <= segments.capacity());
         std::copy(s.begin(), s.end(), &segments.segments[0]);
     }
 
     /** Returns the approximate rank of @p key. */
-    [[nodiscard]] size_t approximate_rank(const K &key, size_t n) const {
+    [[nodiscard]] size_t approximate_rank(const K &key) const {
         auto k = std::max(segments.begin()->key, key);
         decltype(segments.begin()) it;
         if constexpr (Capacity > 0 && Capacity <= 7) {
@@ -138,14 +208,14 @@ public:
         } else {
             it = std::upper_bound(segments.begin(), segments.end(), k);
         }
-        auto limit = it == segments.end() ? n : it->intercept;
+        auto limit = it == segments.end() ? size() : it->intercept;
         return std::min<size_t>((*std::prev(it))(k), limit - 1);
     }
 
     /** Execute a given function for each key in the sorted range [first, last). The function takes as the argument
      * an iterator to the current key and the corresponding approximate rank computed by the index. */
     template<typename ForwardIt, typename F>
-    void for_each(ForwardIt first, ForwardIt last, F f, size_t n) const {
+    void for_each(ForwardIt first, ForwardIt last, F f) const {
         auto segment_it = segments.begin();
         auto limit = segments.size() == 1 ? n : std::next(segment_it)->intercept;
         auto it = first;
@@ -155,31 +225,23 @@ public:
                 limit = std::next(segment_it) == segments.end() ? n : std::next(segment_it)->intercept;
             }
             auto pos = std::min<size_t>((*segment_it)(*it), limit - 1);
-            assert(std::abs(int64_t(pos) - int64_t(std::distance(first, it))) <= epsilon + 1);
+            //assert(std::abs(int64_t(pos) - int64_t(std::distance(first, it))) <= epsilon + 1);
             f(it, pos);
             ++it;
         }
     }
 
-    [[nodiscard]] size_t epsilon_value() const { return epsilon; }
+    /** Returns the number of elements the index was built on. */
+    [[nodiscard]] size_t size() const { return n; }
 
-    /**
-     * Returns the number of segments in the last level of the index.
-     * @return the number of segments
-     */
-    [[nodiscard]] size_t segments_count() const { return segments.size(); }
-
-    /**
-     * Returns the size of the index in bytes.
-     * @return the size of the index in bytes
-     */
+    /**  Returns the size of the index in bytes. */
     [[nodiscard]] size_t size_in_bytes() const { return sizeof(*this) + segments.size_in_bytes(); }
 
 private:
 
     template<size_t ...Capacities>
-    static std::pair<void *, size_t> make_helper(auto first, auto last, uint8_t epsilon,
-                                                 std::integer_sequence<size_t, Capacities...> = {}) {
+    static Holder make_helper(auto first, auto last, uint8_t epsilon,
+                              std::integer_sequence<size_t, Capacities...> = {}) {
         std::vector<Segment> segments;
         auto n = (size_t) std::distance(first, last);
         segments.reserve(n / std::max(2, epsilon * epsilon));
@@ -192,15 +254,17 @@ private:
         void *ptr = nullptr;
         auto test = [&](auto threshold) {
             if (segments.size() <= threshold) {
-                ptr = new ShortPGMIndex<threshold>(segments, epsilon);
+                ptr = new(align_val) ShortPGMIndex<threshold>(segments, n);
                 return false;
             }
             ++i;
             return true;
         };
         (test(std::integral_constant<std::size_t, Capacities>()) && ...)
-            && (i = 0, ptr = new ShortPGMIndex<0>(segments, epsilon), true);
-        return std::make_pair(ptr, i);
+            && (i = 0, ptr = new(align_val) ShortPGMIndex<0>(segments, n), true);
+
+        assert(reinterpret_cast<uint64_t>(ptr) & (size_t(align_val) - 1) == 0);
+        return {ptr, i};
     }
 };
 
