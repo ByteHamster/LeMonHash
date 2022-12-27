@@ -263,7 +263,7 @@ private:
         (test(std::integral_constant<std::size_t, Capacities>()) && ...)
             && (i = 0, ptr = new(align_val) ShortPGMIndex<0>(segments, n), true);
 
-        assert(reinterpret_cast<uint64_t>(ptr) & (size_t(align_val) - 1) == 0);
+        assert((reinterpret_cast<uint64_t>(ptr) & (size_t(align_val) - 1)) == 0);
         return {ptr, i};
     }
 };
