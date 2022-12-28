@@ -17,6 +17,7 @@
 namespace pgm {
 
 class UnalignedPGMIndex {
+    static constexpr auto align_val = std::align_val_t(std::max<size_t>(__STDCPP_DEFAULT_NEW_ALIGNMENT__, 2));
     static constexpr uint8_t first_key_bits = 64;
     static constexpr uint8_t bit_width_bits = 6;
     static constexpr uint8_t slope_bits = 32;
@@ -104,7 +105,7 @@ public:
     UnalignedPGMIndex& operator=(UnalignedPGMIndex &&other) {
         if (this != &other) {
             if (!one_segment)
-                delete[] data();
+                operator delete[] (data(), align_val);
             one_segment = other.one_segment;
             raw_ptr = other.raw_ptr;
             other.one_segment = false;
@@ -115,7 +116,7 @@ public:
 
     ~UnalignedPGMIndex() {
         if (!one_segment)
-            delete[] data();
+            operator delete[] (data(), align_val);
     }
 
     template<typename RandomIt>
@@ -126,23 +127,30 @@ public:
         std::vector<Segment> segments;
         segments.reserve(n / std::max(2, epsilon * epsilon));
 
+        internal::OptimalPiecewiseLinearModel<uint64_t, size_t>::CanonicalSegment first_segment;
         auto in_fun = [&](auto i) { return std::pair<K, size_t>(first[i], i); };
-        auto out_fun = [&](auto cs, auto) { segments.emplace_back(cs); };
+        auto out_fun = [&](auto cs, auto) {
+            if (segments.empty())
+                first_segment = cs;
+            segments.emplace_back(cs);
+        };
         internal::make_segmentation_mod(n, epsilon, in_fun, out_fun, false);
 
-        if (segments.size() == 1 && segments[0].intercept == 0 && n < (1ull << 31) && *first == 0) {
-            // TODO: relax the above conditions
-            one_segment = true;
-            raw_ptr = n << 32 | as_uint32(segments[0].slope);
-            assert(get_one_segment() == std::make_pair(segments[0].slope, (uint32_t) n));
-            return;
+        if (segments.size() == 1 && n < (1ull << 31)) {
+            auto [flag, slope] = first_segment.get_segment_through_zero();
+            if (flag) {
+                one_segment = true;
+                raw_ptr = n << 32 | as_uint32(slope);
+                assert(get_one_segment() == std::make_pair((float) slope, (uint32_t) n));
+                return;
+            }
         }
 
         auto key_bits = BIT_WIDTH(std::max<uint64_t>(1, segments.back().key - segments.front().key));
         auto size_bits = BIT_WIDTH(n);
         auto bit_size = first_key_bits + 2 * bit_width_bits + 2 * size_bits + (key_bits + slope_bits + size_bits) * segments.size();
         auto words = (bit_size + 63) / 64;
-        auto ptr = new(std::align_val_t(std::max<size_t>(__STDCPP_DEFAULT_NEW_ALIGNMENT__, 2))) uint64_t[words];
+        auto ptr = new(align_val) uint64_t[words];
         one_segment = false;
         raw_ptr = reinterpret_cast<uint64_t>(ptr) >> 1;
         assert(reinterpret_cast<uint64_t>(ptr) == raw_ptr << 1);

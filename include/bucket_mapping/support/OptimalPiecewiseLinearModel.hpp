@@ -229,6 +229,30 @@ struct OptimalPiecewiseLinearModel<X, Y>::CanonicalSegment {
         return {i_x, i_y};
     }
 
+    std::pair<bool, long double> get_segment_through_zero() const {
+        auto &p0 = rectangle[0];
+        auto &p1 = rectangle[1];
+        auto &p2 = rectangle[2];
+        auto &p3 = rectangle[3];
+        auto slope1 = p2 - p0;
+        auto slope2 = p3 - p1;
+
+        auto intercept1 = p0.y - p0.x * slope1.dy / slope1.dx;
+        auto intercept2 = p1.y - p1.x * slope2.dy / slope2.dx;
+        if (intercept1 < 0 || intercept2 > 0)
+            return {false, 0};
+
+        if (intercept1 == 0)
+            return {true, static_cast<long double>(slope1)};
+        if (intercept2 == 0)
+            return {true, static_cast<long double>(slope2)};
+
+        auto[i_x, i_y] = get_intersection();
+        if (i_x == 0)
+            return {false, 0};
+        return {true, i_y / i_x};
+    }
+
     std::pair<long double, SY> get_floating_point_segment(const X &origin) const {
         if (one_point())
             return {0, (rectangle[0].y + rectangle[1].y) / 2};
