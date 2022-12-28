@@ -195,6 +195,11 @@ public:
         return std::get<3>(metadata());
     }
 
+    /** Returns the number of segments in the index. */
+    [[nodiscard]] size_t segments_count() const {
+        return std::get<4>(metadata());
+    }
+
     /**  Returns the size of the index in bytes. */
     [[nodiscard]] size_t size_in_bytes() const {
         auto [first_key, key_bits, size_bits, size, n_segments, segments_offset] = metadata();

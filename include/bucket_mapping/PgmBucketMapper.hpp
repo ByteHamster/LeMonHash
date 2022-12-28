@@ -28,11 +28,14 @@ struct PgmBucketMapper : public BucketMapper {
             for (auto b: bucket_sizes)
                 ranks_bits += b <= 1 ? 0ull : b * BIT_WIDTH(b - 1);
 
+            auto segmentsCount = pgm.segments_count();
             auto space = pgm.size_in_bytes() + ranks_bits / 8;
             if (space < best_space) {
-                pgmIndex = pgm;
+                pgmIndex = std::move(pgm);
                 best_space = space;
             }
+            if (segmentsCount == 1)
+                break;
         }
 
         numBuckets_ = bucketOf(*std::prev(end)) + 1;

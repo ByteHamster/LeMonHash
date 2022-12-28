@@ -36,10 +36,13 @@ struct UnalignedPgmBucketMapper {
             p.for_each(begin, end, updateCost);
             updateCost(end, 0);
 
+            auto segmentsCount = p.segments_count();
             if (cost < bestCost) {
                 pgm = std::move(p);
                 bestCost = cost;
             }
+            if (segmentsCount == 1)
+                break;
         }
     }
 

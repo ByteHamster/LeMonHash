@@ -43,6 +43,7 @@ struct SuccinctPgmBucketMapper {
             pgm->for_each(begin, end, updateCost);
             updateCost(end, 0);
 
+            auto segmentsCount = pgm->segments_count();
             if (cost < bestCost) {
                 delete pgmIndex;
                 pgmIndex = pgm;
@@ -50,6 +51,8 @@ struct SuccinctPgmBucketMapper {
             } else {
                 delete pgm;
             }
+            if (segmentsCount == 1)
+                break;
         }
 
         // Evaluate if linear mapper is better

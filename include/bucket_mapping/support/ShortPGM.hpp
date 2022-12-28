@@ -172,6 +172,12 @@ public:
             return size;
         }
 
+        [[nodiscard]] size_t segments_count() const {
+            size_t count = 0;
+            visit([&](const auto index) { count = index->segments_count(); });
+            return count;
+        }
+
         [[nodiscard]] size_t size_in_bytes() const {
             size_t bytes = sizeof(*this);
             visit([&](const auto index) { bytes += index->size_in_bytes(); });
@@ -230,6 +236,9 @@ public:
             ++it;
         }
     }
+
+    /** Returns the number of segments in the index. */
+    [[nodiscard]] size_t segments_count() const { return segments.size(); }
 
     /** Returns the number of elements the index was built on. */
     [[nodiscard]] size_t size() const { return n; }
