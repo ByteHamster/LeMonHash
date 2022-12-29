@@ -229,6 +229,7 @@ struct OptimalPiecewiseLinearModel<X, Y>::CanonicalSegment {
         return {i_x, i_y};
     }
 
+    /** Returns a bool indicating whether the segment can have intercept = 0 and, if so, the corresponding slope. */
     std::pair<bool, long double> get_segment_through_zero() const {
         auto &p0 = rectangle[0];
         auto &p1 = rectangle[1];
@@ -253,22 +254,18 @@ struct OptimalPiecewiseLinearModel<X, Y>::CanonicalSegment {
         return {true, i_y / i_x};
     }
 
-    std::pair<long double, SY> get_floating_point_segment(const X &origin) const {
+    /** Returns the slope and the intercept of the segment f(x) = slope * (x - origin) + intercept. */
+    std::pair<long double, SY> get_floating_point_segment(const X &origin, bool non_negative_slope = true) const {
         if (one_point())
             return {0, (rectangle[0].y + rectangle[1].y) / 2};
 
-        if constexpr (std::is_integral_v<X> && std::is_integral_v<Y>) {
-            auto slope = rectangle[3] - rectangle[1];
-            auto intercept_n = slope.dy * (SX(origin) - rectangle[1].x);
-            auto intercept_d = slope.dx;
-            auto rounding_term = ((intercept_n < 0) ^ (intercept_d < 0) ? -1 : +1) * intercept_d / 2;
-            auto intercept = (intercept_n + rounding_term) / intercept_d + rectangle[1].y;
-            return {static_cast<long double>(slope), intercept};
-        }
-
         auto[i_x, i_y] = get_intersection();
         auto[min_slope, max_slope] = get_slope_range();
-        auto slope = (min_slope + max_slope) / 2.;
+        if (non_negative_slope) {
+            min_slope = std::max(0.L, min_slope);
+            assert(max_slope >= 0.L);
+        }
+        auto slope = (min_slope + max_slope) / 2.L;
         auto intercept = i_y - (i_x - origin) * slope;
         return {slope, intercept};
     }
