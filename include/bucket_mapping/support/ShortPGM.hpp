@@ -138,8 +138,15 @@ public:
         Holder() : ptr(0), type(0) {}
         Holder(void *ptr, size_t type) : ptr(reinterpret_cast<uint64_t>(ptr) >> type_bit_width), type(type) {}
         Holder(const Holder&) = delete;
+
+        Holder(Holder &&other) {
+            ptr = other.ptr;
+            type = other.type;
+            other.ptr = 0;
+            other.type = 0;
+        }
+
         Holder& operator=(const Holder &) = delete;
-        Holder(Holder&&) = delete;
 
         Holder& operator=(Holder &&other) {
             if (this != &other) {
@@ -153,7 +160,7 @@ public:
                 other.type = 0;
             }
             return *this;
-        };
+        }
 
         [[nodiscard]] size_t approximate_rank(const K &key) const {
             size_t rank = 0;

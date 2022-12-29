@@ -40,6 +40,11 @@ class UnalignedPGMIndex {
         return reinterpret_cast<uint64_t *>(raw_ptr << 1);
     }
 
+    void free_data() {
+        if (!one_segment)
+            operator delete[] (data(), align_val);
+    }
+
     [[nodiscard]] std::pair<float, uint32_t> get_one_segment() const {
         assert(one_segment);
         uint32_t n = raw_ptr >> 32;
@@ -108,14 +113,19 @@ class UnalignedPGMIndex {
 public:
 
     UnalignedPGMIndex() : one_segment(false), raw_ptr(0) {}
-    UnalignedPGMIndex(const UnalignedPGMIndex&) = delete;
-    UnalignedPGMIndex& operator=(const UnalignedPGMIndex &) = delete;
-    UnalignedPGMIndex(UnalignedPGMIndex&&) = delete;
+    UnalignedPGMIndex(const UnalignedPGMIndex &other) = delete;
+    UnalignedPGMIndex(UnalignedPGMIndex &&other) {
+        one_segment = other.one_segment;
+        raw_ptr = other.raw_ptr;
+        other.one_segment = false;
+        other.raw_ptr = 0;
+    }
+
+    UnalignedPGMIndex& operator=(const UnalignedPGMIndex &other) = delete;
 
     UnalignedPGMIndex& operator=(UnalignedPGMIndex &&other) {
         if (this != &other) {
-            if (!one_segment)
-                operator delete[] (data(), align_val);
+            free_data();
             one_segment = other.one_segment;
             raw_ptr = other.raw_ptr;
             other.one_segment = false;
@@ -125,8 +135,7 @@ public:
     };
 
     ~UnalignedPGMIndex() {
-        if (!one_segment)
-            operator delete[] (data(), align_val);
+        free_data();
     }
 
     template<typename RandomIt>
