@@ -363,22 +363,25 @@ class RecursiveDirectRankStoringV2Mmphf {
         #pragma pack(push, 1)
         struct TreeNode {
             static constexpr bool useIndirection = sizeof(BucketMapperType) > 8;
-            using index_type = uint16_t;
+
             union {
                 std::conditional_t<useIndirection, BucketMapperType *, BucketMapperType> bucketMapper;
                 size_t numChildren = 0;
             };
             bool directRankStoring : 1 = false;
             uint32_t offsetsOffset : 31 = 0;
-            index_type indexes[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+            uint64_t indexes = 0;
+
+            static constexpr uint8_t packBaseBits = 15;
+            static constexpr uint8_t packDeltaBits = (sizeof(indexes) * 8 - packBaseBits) / 7;
 
             TreeNode() {}
             TreeNode(const TreeNode &other) = delete;
+
             TreeNode(TreeNode &&other) {
                 directRankStoring = other.directRankStoring;
                 offsetsOffset = other.offsetsOffset;
-                for (size_t i = 0; i < 8; i++)
-                    indexes[i] = other.indexes[i];
+                indexes = other.indexes;
                 if (directRankStoring)
                     numChildren = other.numChildren;
                 else
@@ -387,6 +390,7 @@ class RecursiveDirectRankStoringV2Mmphf {
                 other.directRankStoring = false;
                 other.offsetsOffset = 0;
             }
+
             TreeNode& operator=(const TreeNode &) = delete;
             TreeNode& operator=(TreeNode &&) = delete;
 
@@ -408,23 +412,41 @@ class RecursiveDirectRankStoringV2Mmphf {
                 maybe_new(bucketMapper, begin, end);
             }
 
-            void setIndexes(const auto &other) {
-                if (other[0] > std::numeric_limits<index_type>::max())
-                    throw std::runtime_error("Not yet implemented (1)");
+            std::vector<uint32_t> storeIndexes(const auto &other) {
+                if (other[0] > (1ull << packBaseBits))
+                    throw std::runtime_error("Value too large for the current packing scheme");
 
-                indexes[0] = other[0];
-                for (size_t i = 1; i < other.size(); ++i) {
-                    if (other[i] - other[i - 1] > std::numeric_limits<index_type>::max())
-                        throw std::runtime_error("Not yet implemented (2)");
-                    indexes[i] = other[i] - other[i - 1];
+                indexes = 0;
+                indexes |= other[0];
+                size_t previous = other[0];
+                uint64_t maxDeltaValue = (1ull << packDeltaBits) - 1;
+                std::vector<uint32_t> storedIndexes = { other[0] };
+                storedIndexes.reserve(8);
+                for (size_t packed = 1, i = 1; packed < 8 && i < other.size(); ++packed) {
+                    if (other[i] - previous >= (1ull << packDeltaBits)) {
+                        indexes |= maxDeltaValue << (packBaseBits + (packed - 1) * packDeltaBits);
+                        previous += maxDeltaValue;
+                        storedIndexes.push_back(previous);
+                    } else {
+                        indexes |= (other[i] - previous) << (packBaseBits + (packed - 1) * packDeltaBits);
+                        previous = other[i];
+                        ++i;
+                        storedIndexes.push_back(previous);
+                    }
                 }
+                return storedIndexes;
             }
 
-            auto getIndexes() const {
+            std::vector<uint32_t> getIndexes() const {
                 std::vector<uint32_t> result;
-                result.push_back(indexes[0]);
-                for (size_t i = 1; i < 8 && indexes[i]; ++i)
-                    result.push_back(result[i - 1] + indexes[i]);
+                result.reserve(8);
+                result.push_back(indexes & ((1ull << packBaseBits) - 1));
+                for (size_t i = 1; i < 8; ++i) {
+                    auto delta = (indexes >> (packBaseBits + (i - 1) * packDeltaBits)) & ((1ull << packDeltaBits) - 1);
+                    if (delta == 0)
+                        break;
+                    result.push_back(result.back() + delta);
+                }
                 return result;
             }
 
@@ -462,8 +484,7 @@ class RecursiveDirectRankStoringV2Mmphf {
         void constructNode(const auto begin, const auto end, const auto lcpsBegin, const auto lcpsEnd,
                            const size_t knownCommonPrefixLength, size_t offset, const std::string &path, size_t layer) {
             TreeNode treeNode;
-            auto indexes = distinctMinima(lcpsBegin + 1, lcpsEnd, 8, knownCommonPrefixLength);
-            treeNode.setIndexes(indexes);
+            auto indexes = treeNode.storeIndexes(distinctMinima(lcpsBegin + 1, lcpsEnd, 8, knownCommonPrefixLength));
             if (bucketOffsetsInput.size() <= layer) {
                 bucketOffsetsInput.resize(layer + 1);
             }
