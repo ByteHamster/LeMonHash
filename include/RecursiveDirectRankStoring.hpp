@@ -92,11 +92,12 @@ class RecursiveDirectRankStoringMmphf {
             }
 
             template<typename RandomIt>
-            void buildBucketMapper(RandomIt begin, RandomIt end) {
+            void buildBucketMapper(RandomIt begin, RandomIt end,
+                                   std::unordered_map<uint64_t, size_t> &chunkOccurrences) {
                 if (!directRankStoring)
                     maybe_delete(bucketMapper);
                 directRankStoring = false;
-                maybe_new(bucketMapper, begin, end);
+                maybe_new(bucketMapper, begin, end, chunkOccurrences);
             }
 
             ~TreeNode() {
@@ -139,7 +140,8 @@ class RecursiveDirectRankStoringMmphf {
             size_t nThisNode = std::distance(begin, end);
 
             std::vector<uint64_t> chunks;
-            extractChunks(begin, end, chunks, treeNode.minLCP);
+            std::unordered_map<uint64_t, size_t> chunkOccurrences;
+            extractChunks(begin, end, chunks, chunkOccurrences, treeNode.minLCP);
             assert(chunks.size() >= 2); // If all were the same, we would have not cut off enough
 
             if (chunks.size() < CHUNK_DIRECT_RANK_STORING_THRESHOLD) {
@@ -162,7 +164,7 @@ class RecursiveDirectRankStoringMmphf {
                     bucketSizePrefixTemp += std::distance(currentBucketBegin, it);
                 }
             } else {
-                treeNode.buildBucketMapper(chunks.begin(), chunks.end());
+                treeNode.buildBucketMapper(chunks.begin(), chunks.end(), chunkOccurrences);
                 size_t numBuckets = treeNode.getBucketMapper().numBuckets();
                 assert(numBuckets >= 2);
 
@@ -216,7 +218,8 @@ class RecursiveDirectRankStoringMmphf {
             return minLCP;
         }
 
-        void extractChunks(const auto begin, const auto end, std::vector<uint64_t> &chunks, size_t minLCP) {
+        void extractChunks(const auto begin, const auto end, std::vector<uint64_t> &chunks,
+                           std::unordered_map<uint64_t, size_t> &chunkOccurrences, size_t minLCP) {
             uint64_t previousChunk = 0;
             auto it = begin;
             while (it != end) {
@@ -226,6 +229,10 @@ class RecursiveDirectRankStoringMmphf {
                     chunks.push_back(chunk);
                     previousChunk = chunk;
                 }
+                if (!chunkOccurrences.contains(chunk)) {
+                    chunkOccurrences.insert(std::make_pair(chunk, 0));
+                }
+                chunkOccurrences.at(chunk)++;
                 it++;
             }
         }
@@ -405,11 +412,12 @@ class RecursiveDirectRankStoringV2Mmphf {
             }
 
             template<typename RandomIt>
-            void buildBucketMapper(RandomIt begin, RandomIt end) {
+            void buildBucketMapper(RandomIt begin, RandomIt end,
+                                   std::unordered_map<uint64_t, size_t> &chunkOccurrences) {
                 if (!directRankStoring)
                     maybe_delete(bucketMapper);
                 directRankStoring = false;
-                maybe_new(bucketMapper, begin, end);
+                maybe_new(bucketMapper, begin, end, chunkOccurrences);
             }
 
             std::vector<uint32_t> storeIndexes(const auto &other) {
@@ -492,7 +500,8 @@ class RecursiveDirectRankStoringV2Mmphf {
             size_t nThisNode = std::distance(begin, end);
 
             std::vector<uint64_t> chunks;
-            extractChunks(begin, end, chunks, indexes);
+            std::unordered_map<uint64_t, size_t> chunkOccurrences;
+            extractChunks(begin, end, chunks, chunkOccurrences, indexes);
             assert(chunks.size() >= 2); // If all were the same, we would have not cut off enough
 
             if (chunks.size() < CHUNK_DIRECT_RANK_STORING_THRESHOLD) {
@@ -517,7 +526,7 @@ class RecursiveDirectRankStoringV2Mmphf {
                     bucketSizePrefixTemp += std::distance(currentBucketBegin, it);
                 }
             } else {
-                treeNode.buildBucketMapper(chunks.begin(), chunks.end());
+                treeNode.buildBucketMapper(chunks.begin(), chunks.end(), chunkOccurrences);
                 size_t numBuckets = treeNode.getBucketMapper().numBuckets();
                 assert(numBuckets >= 2);
 
@@ -556,7 +565,8 @@ class RecursiveDirectRankStoringV2Mmphf {
             treeNodes.emplace(path, std::move(treeNode));
         }
 
-        void extractChunks(const auto begin, const auto end, std::vector<uint64_t> &chunks, const auto &indexes) {
+        void extractChunks(const auto begin, const auto end, std::vector<uint64_t> &chunks,
+                           std::unordered_map<uint64_t, size_t> &chunkOccurrences, const auto &indexes) {
             uint64_t previousChunk = 0;
             auto it = begin;
             while (it != end) {
@@ -566,6 +576,10 @@ class RecursiveDirectRankStoringV2Mmphf {
                     chunks.push_back(chunk);
                     previousChunk = chunk;
                 }
+                if (!chunkOccurrences.contains(chunk)) {
+                    chunkOccurrences.insert(std::make_pair(chunk, 0));
+                }
+                chunkOccurrences.at(chunk)++;
                 it++;
             }
         }

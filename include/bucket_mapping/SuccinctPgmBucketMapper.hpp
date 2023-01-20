@@ -41,7 +41,7 @@ struct SuccinctPgmBucketMapper {
             previousBucket = 0;
             bucketBegin = begin;
             pgm->for_each(begin, end, updateCost);
-            updateCost(end, 0);
+            updateCost(end, std::numeric_limits<uint64_t>::max());
 
             auto segmentsCount = pgm->segments_count();
             if (cost < bestCost) {
@@ -62,7 +62,7 @@ struct SuccinctPgmBucketMapper {
         bucketBegin = begin;
         for (auto it = begin; it != end; ++it)
             updateCost(it, linearMapper(*it, n, tmpUOverN));
-        updateCost(end, 0);
+        updateCost(end, std::numeric_limits<uint64_t>::max());
 
         if (cost < bestCost) {
             delete pgmIndex;
@@ -73,6 +73,7 @@ struct SuccinctPgmBucketMapper {
             usesPgmIndex = true;
             numBuckets_ = bucketOf(*std::prev(end)) + 1;
         }
+        assert(numBuckets_ > 1 && "Need at least 2 buckets, otherwise we get a loop");
     }
 
     [[nodiscard]] size_t bucketOf(uint64_t key) const  {
