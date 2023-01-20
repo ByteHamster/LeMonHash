@@ -4,6 +4,7 @@
 #include <string>
 #include <unordered_set>
 #include <algorithm>
+#include <bit>
 #include "StringBuilder.hpp"
 
 std::string toHexString(const char *string, size_t length) {
@@ -119,3 +120,71 @@ uint64_t readChunk(const char *string, size_t stringLength, Iterator indexesBegi
         chunkRaw[chunkWidth - 1 - (it - indexesBegin)] = string[*it];
     return chunk;
 }
+
+/** Stores a subset of the alphabet of 1-byte values [0, 1, ..., 255]. */
+class AlphabetMap {
+    uint64_t bitMap[4] = {0, 0, 0, 0};
+
+public:
+
+    AlphabetMap() = default;
+
+    /** Constructs from the alphabet of the strings in the given range. */
+    AlphabetMap(const auto begin, const auto end, bool includeTerminator = true) {
+        if (includeTerminator)
+            bitMap[0] = 1;
+        for (auto it = begin; it != end; ++it)
+            for (uint8_t c : *it)
+                bitMap[c / 64] |= 1ull << (c % 64);
+    }
+
+    /** Constructs from the alphabet of the strings in the given range, where only a substring of each string is
+     * considered. */
+    AlphabetMap(const auto begin, const auto end, size_t fromIndex, size_t toIndex = std::string_view::npos - 1,
+                bool includeTerminator = true) {
+        if (includeTerminator)
+            bitMap[0] = 1;
+        for (auto it = begin; it != end; ++it)
+            for (uint8_t c : std::string_view(*it).substr(fromIndex, std::min(toIndex + 1, it->size()) - fromIndex))
+                bitMap[c / 64] |= 1ull << (c % 64);
+    }
+
+    /** Returns the rank of a given character in the alphabet. */
+    uint8_t rank(uint8_t c) const {
+        auto rank = 0;
+        for (auto i = 0; i < c / 64; i++)
+            rank += std::popcount(bitMap[i]);
+        return rank + std::popcount(bitMap[c / 64] & ((1ull << (c % 64)) - 1));
+    }
+
+    /** Returns true iff the given alphabet map is contained in this alphabet map. */
+    bool contains(const AlphabetMap &other) const {
+        for (auto i = 0; i < 4; i++)
+            if ((bitMap[i] & other.bitMap[i]) != other.bitMap[i])
+                return false;
+        return true;
+    }
+
+    /** Returns the number of characters in the alphabet. */
+    uint8_t size() const {
+        return std::accumulate(bitMap, bitMap + 4, 0, [](auto a, auto b) { return a + std::popcount(b); });
+    }
+
+    /** Returns the length of the longest string from this alphabet that can be fit in a 64-bit integer. */
+    uint8_t length64() const {
+        return uint8_t(63 / std::log2(size()));
+    }
+
+    /** Creates a uint64_t from a prefix of the given string. */
+    uint64_t readChunk(const char *string, size_t stringLength) const {
+        auto sigma = size();
+        auto characters = length64();
+        uint64_t chunk = 0;
+        size_t i = 0;
+        for (; i < characters && i < stringLength; i++)
+            chunk = chunk * sigma + rank(string[i]);
+        for (; i < characters; i++)
+            chunk *= sigma;
+        return chunk;
+    }
+};

@@ -73,7 +73,6 @@ struct SuccinctPgmBucketMapper {
             usesPgmIndex = true;
             numBuckets_ = bucketOf(*std::prev(end)) + 1;
         }
-        assert(numBuckets_ > 1 && "Need at least 2 buckets, otherwise we get a loop");
     }
 
     [[nodiscard]] size_t bucketOf(uint64_t key) const  {

@@ -192,7 +192,7 @@ public:
     [[nodiscard]] size_t approximate_rank(const K &key) const {
         if (one_segment) {
             auto [slope, n] = get_one_segment();
-            auto p = int64_t(key * slope);
+            auto p = int64_t(std::round(key * slope));
             return std::min<size_t>(p > 0 ? size_t(p) : 0ull, n - 1);
         }
 
@@ -222,7 +222,7 @@ public:
         }
 
         auto [segment_key, slope, intercept, next_intercept] = segment(i - 1);
-        auto pos = int64_t(slope * (key - segment_key)) + intercept;
+        auto pos = int64_t(std::round(slope * (key - segment_key))) + intercept;
         return std::min<size_t>(pos > 0 ? size_t(pos) : 0ull, next_intercept - 1);
     }
 
@@ -233,7 +233,7 @@ public:
         if (one_segment) {
             auto [slope, n] = get_one_segment();
             while (first != last) {
-                auto p = int64_t(*first * slope);
+                auto p = int64_t(std::round(*first * slope));
                 f(first, std::min<size_t>(p > 0 ? size_t(p) : 0ull, n - 1));
                 ++first;
             }
@@ -253,7 +253,7 @@ public:
                 if (segment_i + 1 != n_segments)
                     next_segment_key = first_key + segment_key_delta(segment_i + 1, segments_offset, segment_bits, key_bits);
             }
-            auto pos = int64_t(slope * (*it - segment_key)) + intercept;
+            auto pos = int64_t(std::round(slope * (*it - segment_key))) + intercept;
             f(it, std::min<size_t>(pos > 0 ? size_t(pos) : 0ull, next_intercept - 1));
             ++it;
         }
