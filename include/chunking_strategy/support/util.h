@@ -187,4 +187,17 @@ public:
             chunk *= sigma;
         return chunk;
     }
+
+    /** Creates a uint64_t from the characters at the given indexes of the given string. */
+    uint64_t readChunk(const char *string, size_t stringLength, const auto &indexes) const {
+        auto sigma = size();
+        auto characters = length64();
+        uint64_t chunk = 0;
+        size_t i = 0;
+        for (; i < characters && i < indexes.size() && indexes[i] < stringLength; i++)
+            chunk = chunk * sigma + rank(string[indexes[i]]);
+        for (; i < characters; i++)
+            chunk *= sigma;
+        return chunk;
+    }
 };

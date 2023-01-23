@@ -124,7 +124,7 @@ class RecursiveDirectRankStoringMmphf {
             constructNode(strings.begin(), strings.end(), 0, 0, PATH_ROOT, 0, 0);
             retrieval.build();
 
-            for (std::vector<size_t> v : bucketOffsetsInput) {
+            for (auto &v : bucketOffsetsInput) {
                 auto *fano = new PartitionedEliasFano(v);
                 bucketOffsets.push_back(fano);
             }
@@ -396,22 +396,27 @@ class RecursiveDirectRankStoringV2Mmphf {
 
         static constexpr size_t CHUNK_DIRECT_RANK_STORING_THRESHOLD = 128;
 
+        static constexpr size_t LOG2_ALPHABET_MAPS_COUNT = 10;
+
         const std::string PATH_ROOT = "root";
 
         #pragma pack(push, 1)
         struct TreeNode {
             static constexpr bool useIndirection = sizeof(BucketMapperType) > 8;
-
+            static constexpr uint8_t offsetsOffsetBits = 47 - LOG2_ALPHABET_MAPS_COUNT;
             union {
                 std::conditional_t<useIndirection, BucketMapperType *, BucketMapperType> bucketMapper;
                 size_t numChildren = 0;
             };
             bool directRankStoring : 1 = false;
-            uint32_t offsetsOffset : 31 = 0;
-            uint64_t indexes = 0;
+            size_t offsetsOffset : offsetsOffsetBits = 0;
+            size_t alphabetMapIndex : LOG2_ALPHABET_MAPS_COUNT;
+            uint64_t packedIndexes = 0;
 
             static constexpr uint8_t packBaseBits = 15;
-            static constexpr uint8_t packDeltaBits = (sizeof(indexes) * 8 - packBaseBits) / 7;
+            static uint8_t getPackDeltaBits(uint8_t maxIndexesCount) {
+                return (sizeof(packedIndexes) * 8 - packBaseBits) / (maxIndexesCount - 1);
+            }
 
             TreeNode() {}
             TreeNode(const TreeNode &other) = delete;
@@ -419,7 +424,8 @@ class RecursiveDirectRankStoringV2Mmphf {
             TreeNode(TreeNode &&other) {
                 directRankStoring = other.directRankStoring;
                 offsetsOffset = other.offsetsOffset;
-                indexes = other.indexes;
+                alphabetMapIndex = other.alphabetMapIndex;
+                packedIndexes = other.packedIndexes;
                 if (directRankStoring)
                     numChildren = other.numChildren;
                 else
@@ -427,6 +433,7 @@ class RecursiveDirectRankStoringV2Mmphf {
                 other.numChildren = 0;
                 other.directRankStoring = false;
                 other.offsetsOffset = 0;
+                other.alphabetMapIndex = 0;
             }
 
             TreeNode& operator=(const TreeNode &) = delete;
@@ -451,24 +458,26 @@ class RecursiveDirectRankStoringV2Mmphf {
                 maybe_new(bucketMapper, begin, end);
             }
 
-            std::vector<uint32_t> storeIndexes(const auto &other) {
-                if (other[0] > (1ull << packBaseBits))
+            std::vector<uint32_t> storeIndexes(const auto &indexes, uint8_t maxIndexesCount) {
+                if (indexes[0] >= 1ull << packBaseBits)
                     throw std::runtime_error("Value too large for the current packing scheme");
 
-                indexes = 0;
-                indexes |= other[0];
-                size_t previous = other[0];
-                uint64_t maxDeltaValue = (1ull << packDeltaBits) - 1;
-                std::vector<uint32_t> storedIndexes = { other[0] };
-                storedIndexes.reserve(8);
-                for (size_t packed = 1, i = 1; packed < 8 && i < other.size(); ++packed) {
-                    if (other[i] - previous >= (1ull << packDeltaBits)) {
-                        indexes |= maxDeltaValue << (packBaseBits + (packed - 1) * packDeltaBits);
+                const auto packDeltaBits = getPackDeltaBits(maxIndexesCount);
+                const auto maxDeltaValue = (uint64_t(1) << packDeltaBits) - 1;
+
+                // store indexes[0] in packBaseBits, and indexes[i]-indexes[i-1] (i>0) in packDeltaBits
+                packedIndexes = 0;
+                packedIndexes |= indexes[0];
+                size_t previous = indexes[0];
+                std::vector<uint32_t> storedIndexes = { indexes[0] };
+                storedIndexes.reserve(maxIndexesCount);
+                for (size_t deltaSlot = 0, i = 1; deltaSlot < maxIndexesCount - 1u && i < indexes.size(); ++deltaSlot) {
+                    if (indexes[i] - previous >= maxDeltaValue) { // indexes[i] will span this slot and the next one(s)
+                        packedIndexes |= maxDeltaValue << (packBaseBits + deltaSlot * packDeltaBits);
                         previous += maxDeltaValue;
-                        storedIndexes.push_back(previous);
                     } else {
-                        indexes |= (other[i] - previous) << (packBaseBits + (packed - 1) * packDeltaBits);
-                        previous = other[i];
+                        packedIndexes |= (indexes[i] - previous) << (packBaseBits + deltaSlot * packDeltaBits);
+                        previous = indexes[i];
                         ++i;
                         storedIndexes.push_back(previous);
                     }
@@ -476,15 +485,28 @@ class RecursiveDirectRankStoringV2Mmphf {
                 return storedIndexes;
             }
 
-            std::vector<uint32_t> getIndexes() const {
+            std::vector<uint32_t> getIndexes(uint8_t maxIndexesCount) const {
+                const auto packDeltaBits = getPackDeltaBits(maxIndexesCount);
+                const auto maxDeltaValue = (uint64_t(1) << packDeltaBits) - 1;
                 std::vector<uint32_t> result;
-                result.reserve(8);
-                result.push_back(indexes & ((1ull << packBaseBits) - 1));
-                for (size_t i = 1; i < 8; ++i) {
-                    auto delta = (indexes >> (packBaseBits + (i - 1) * packDeltaBits)) & ((1ull << packDeltaBits) - 1);
-                    if (delta == 0)
+                result.reserve(maxIndexesCount);
+                result.push_back(packedIndexes & ((1ull << packBaseBits) - 1));
+                uint64_t data = packedIndexes >> packBaseBits;
+                uint64_t accumulator = 0;
+                for (size_t i = 1; i < maxIndexesCount; ++i) {
+                    if (data == 0) {
+                        if (accumulator > 0)
+                            result.push_back(result.back() + accumulator);
                         break;
-                    result.push_back(result.back() + delta);
+                    }
+                    auto delta = data & ((1ull << packDeltaBits) - 1);
+                    if (delta == maxDeltaValue) {
+                        accumulator += maxDeltaValue;
+                    } else {
+                        result.push_back(result.back() + delta + accumulator);
+                        accumulator = 0;
+                    }
+                    data >>= packDeltaBits;
                 }
                 return result;
             }
@@ -503,37 +525,62 @@ class RecursiveDirectRankStoringV2Mmphf {
         std::unordered_map<std::string, TreeNode> treeNodes; // TODO: Use perfect hashing
         std::vector<PartitionedEliasFano *> bucketOffsets;
         std::vector<std::vector<size_t>> bucketOffsetsInput;
+        std::vector<AlphabetMap> alphabetMaps;
+
     public:
         explicit RecursiveDirectRankStoringV2Mmphf(const std::vector<std::string> &strings) {
             N = strings.size();
             auto lcps = computeLCPs(strings.begin(), strings.end());
-            constructNode(strings.begin(), strings.end(), lcps.begin(), lcps.end(), 0, 0, PATH_ROOT, 0);
+            constructNode(strings.begin(), strings.end(), lcps.begin(), lcps.end(), 0, 0, PATH_ROOT, 0, 0);
             retrieval.build();
 
-            for (std::vector<size_t> v : bucketOffsetsInput) {
+            for (auto &v : bucketOffsetsInput) {
                 auto *fano = new PartitionedEliasFano(v);
                 bucketOffsets.push_back(fano);
             }
             bucketOffsetsInput.clear();
             bucketOffsetsInput.shrink_to_fit();
-
+            alphabetMaps.shrink_to_fit();
             //std::ofstream myfile("tree2.dot");
             //exportTreeStructure(myfile);
             //myfile.close();
         }
     private:
         void constructNode(const auto begin, const auto end, const auto lcpsBegin, const auto lcpsEnd,
-                           const size_t knownCommonPrefixLength, size_t offset, const std::string &path, size_t layer) {
-            TreeNode treeNode;
-            auto indexes = treeNode.storeIndexes(distinctMinima(lcpsBegin + 1, lcpsEnd, 8, knownCommonPrefixLength));
-            if (bucketOffsetsInput.size() <= layer) {
-                bucketOffsetsInput.resize(layer + 1);
-            }
-            treeNode.offsetsOffset = bucketOffsetsInput.at(layer).size();
+                           const size_t knownCommonPrefixLength, size_t offset, const std::string &path, size_t layer,
+                           size_t ancestorAlphabetMapIndex) {
             size_t nThisNode = std::distance(begin, end);
 
+            if (bucketOffsetsInput.size() <= layer)
+                bucketOffsetsInput.resize(layer + 1);
+            if (bucketOffsetsInput.at(layer).size() > size_t(1) << TreeNode::offsetsOffsetBits)
+                throw std::runtime_error("Increase offsetsOffsetBits");
+
+            TreeNode treeNode;
+            treeNode.offsetsOffset = bucketOffsetsInput.at(layer).size();
+
+            if (alphabetMaps.size() < 1 << LOG2_ALPHABET_MAPS_COUNT && layer <= 1 && nThisNode > DIRECT_RANK_STORING_THRESHOLD) {
+                size_t minLCP = *std::min_element(lcpsBegin + 1, lcpsEnd);
+                AlphabetMap am(begin, end, minLCP);
+                if (!alphabetMaps.empty() && am.length64() == alphabetMaps[ancestorAlphabetMapIndex].length64()) {
+                    treeNode.alphabetMapIndex = ancestorAlphabetMapIndex;
+                } else {
+                    treeNode.alphabetMapIndex = alphabetMaps.size();
+                    alphabetMaps.push_back(am);
+//                    std::cout << "layer=" << layer << " chunkSize=" << (int) am.length64()
+//                              << " alphabetSize=" << (int) alphabetMaps.back().size() << std::endl;
+                }
+            } else {
+                treeNode.alphabetMapIndex = ancestorAlphabetMapIndex;
+            }
+
+            auto maxIndexesCount = alphabetMaps[treeNode.alphabetMapIndex].length64();
+            auto minima = distinctMinima(lcpsBegin + 1, lcpsEnd, maxIndexesCount, knownCommonPrefixLength);
+            auto indexes = treeNode.storeIndexes(minima, maxIndexesCount);
+            assert(indexes == treeNode.getIndexes(maxIndexesCount));
+
             std::vector<uint64_t> chunks;
-            extractChunks(begin, end, chunks, indexes);
+            extractChunks(begin, end, chunks, indexes, alphabetMaps[treeNode.alphabetMapIndex]);
             assert(chunks.size() >= 2); // If all were the same, we would have not cut off enough
 
             auto tryPgmMapper = chunks.size() > CHUNK_DIRECT_RANK_STORING_THRESHOLD;
@@ -552,26 +599,25 @@ class RecursiveDirectRankStoringV2Mmphf {
                     size_t prev_bucket = 0;
                     size_t bucketSizePrefixTemp = 0;
 
-                    treeNode.getBucketMapper()
-                        .bucketOf(chunks.begin(), chunks.end(), [&](auto chunks_it, size_t bucket) {
-                            while (it != end && readChunkIndexes(*it, indexes) < *chunks_it)
-                                ++it;
-                            while (prev_bucket < bucket) {
-                                constructChild(currentBucketBegin, it,
-                                               lcpsBegin + (currentBucketBegin - begin), lcpsBegin + (it - begin),
-                                               offset + bucketSizePrefixTemp, indexes[0],
-                                               path + "/" + std::to_string(prev_bucket), layer);
-                                bucketSizePrefixTemp += std::distance(currentBucketBegin, it);
-                                currentBucketBegin = it;
-                                prev_bucket++;
-                            }
-                        });
+                    treeNode.getBucketMapper().bucketOf(chunks.begin(), chunks.end(), [&](auto chunks_it, size_t bucket) {
+                        while (it != end && readChunk(*it, indexes, alphabetMaps[treeNode.alphabetMapIndex]) < *chunks_it)
+                            ++it;
+                        while (prev_bucket < bucket) {
+                            constructChild(currentBucketBegin, it,
+                                           lcpsBegin + (currentBucketBegin - begin), lcpsBegin + (it - begin),
+                                           offset + bucketSizePrefixTemp, indexes[0],
+                                           path + "/" + std::to_string(prev_bucket), layer, treeNode.alphabetMapIndex);
+                            bucketSizePrefixTemp += std::distance(currentBucketBegin, it);
+                            currentBucketBegin = it;
+                            prev_bucket++;
+                        }
+                    });
                     it = end;
                     while (prev_bucket < numBuckets) {
                         constructChild(currentBucketBegin, it,
                                        lcpsBegin + (currentBucketBegin - begin), lcpsBegin + (it - begin),
                                        offset + bucketSizePrefixTemp, indexes[0],
-                                       path + "/" + std::to_string(prev_bucket), layer);
+                                       path + "/" + std::to_string(prev_bucket), layer, treeNode.alphabetMapIndex);
                         bucketSizePrefixTemp += std::distance(currentBucketBegin, it);
                         currentBucketBegin = it;
                         prev_bucket++;
@@ -588,14 +634,14 @@ class RecursiveDirectRankStoringV2Mmphf {
                 for (size_t chunk = 0; chunk < chunks.size(); chunk++) {
                     uint64_t chunkValue = chunks.at(chunk);
                     auto currentBucketBegin = it;
-                    while (it != end && readChunkIndexes(*it, indexes) == chunkValue)
+                    while (it != end && readChunk(*it, indexes, alphabetMaps[treeNode.alphabetMapIndex]) == chunkValue)
                         ++it;
                     std::string key = "Chunk" + path + "/" + std::to_string(chunkValue);
                     retrieval.addInput(chunks.size(), key, chunk);
                     constructChild(currentBucketBegin, it,
                                    lcpsBegin + (currentBucketBegin - begin), lcpsBegin + (it - begin),
                                    offset + bucketSizePrefixTemp, indexes[0],
-                                   path + "/" + std::to_string(chunk), layer);
+                                   path + "/" + std::to_string(chunk), layer, treeNode.alphabetMapIndex);
                     bucketSizePrefixTemp += std::distance(currentBucketBegin, it);
                 }
             }
@@ -603,15 +649,16 @@ class RecursiveDirectRankStoringV2Mmphf {
             treeNodes.emplace(path, std::move(treeNode));
         }
 
-        uint64_t readChunkIndexes(const std::string &s, const auto &indexes) {
-            return readChunk(s.c_str(), s.length(), indexes.begin(), indexes.end());
+        uint64_t readChunk(const std::string &s, const auto &indexes, const AlphabetMap &alphabetMap) const {
+            return alphabetMap.readChunk(s.c_str(), s.length(), indexes);
         }
 
-        void extractChunks(const auto begin, const auto end, std::vector<uint64_t> &chunks, const auto &indexes) {
+        void extractChunks(const auto begin, const auto end, std::vector<uint64_t> &chunks, const auto &indexes,
+                           const AlphabetMap &alphabetMap) {
             uint64_t previousChunk = 0;
             auto it = begin;
             while (it != end) {
-                uint64_t chunk = readChunkIndexes(*it, indexes);
+                uint64_t chunk = readChunk(*it, indexes, alphabetMap);
                 assert(chunk >= previousChunk);
                 if (chunk != previousChunk || chunks.empty()) {
                     chunks.push_back(chunk);
@@ -622,7 +669,7 @@ class RecursiveDirectRankStoringV2Mmphf {
         }
 
         void constructChild(auto begin, auto end, auto lcpsBegin, auto lcpsEnd, size_t offset,
-                            size_t minLCP, std::string path, size_t layer) {
+                            size_t minLCP, std::string path, size_t layer, size_t ancestorAlphabetMapIndex) {
             bucketOffsetsInput.at(layer).push_back(offset);
             size_t currentBucketSize = std::distance(begin, end);
             if (currentBucketSize <= 1) {
@@ -638,7 +685,7 @@ class RecursiveDirectRankStoringV2Mmphf {
                 }
             } else {
                 // Recurse
-                constructNode(begin, end, lcpsBegin, lcpsEnd, minLCP, offset, path, layer + 1);
+                constructNode(begin, end, lcpsBegin, lcpsEnd, minLCP, offset, path, layer + 1, ancestorAlphabetMapIndex);
             }
         }
 
@@ -660,6 +707,7 @@ class RecursiveDirectRankStoringV2Mmphf {
             std::cout<<"Bucket offsets:      "<<1.0 * std::accumulate(bucketOffsets.begin(), bucketOffsets.end(), 0,
                                                                       [] (size_t size, PartitionedEliasFano *fano) { return size + fano->bit_size(); }) / N<<std::endl;
             std::cout<<"Tree node data:      "<<(8.0 * treeNodes.size() * sizeof(TreeNode) + 3.0 * treeNodes.size())/N<<std::endl;
+            std::cout<<"Alphabet maps:       "<<8.0 * alphabetMaps.size() * sizeof(AlphabetMap) / N<<std::endl;
             std::cout<<"Height:              "<<bucketOffsets.size()<<std::endl;
             std::cout<<"Nodes:               "<<treeNodes.size()<<std::endl;
 
@@ -671,6 +719,7 @@ class RecursiveDirectRankStoringV2Mmphf {
                                           [] (size_t size, PartitionedEliasFano *fano) { return size + fano->bit_size(); })
                         + 8 * std::accumulate(treeNodes.begin(), treeNodes.end(), 0,
                                               [] (size_t size, auto &node) { return size + node.second.size(); })
+                        + 8 * alphabetMaps.size() * sizeof(AlphabetMap)
                         + 3 * treeNodes.size(); // Use an MPHF instead of std::unordered_map
         }
 
@@ -716,8 +765,9 @@ class RecursiveDirectRankStoringV2Mmphf {
             TreeNode *node = &treeNodes.at(path);
             size_t layer = 0;
             while (true) {
-                auto indexes = node->getIndexes();
-                uint64_t chunk = readChunkIndexes(string, indexes);
+                auto &alphabetMap = alphabetMaps.at(node->alphabetMapIndex);
+                auto indexes = node->getIndexes(alphabetMap.length64());
+                uint64_t chunk = readChunk(string, indexes, alphabetMap);
                 size_t bucket;
 
                 if (node->directRankStoring) {
