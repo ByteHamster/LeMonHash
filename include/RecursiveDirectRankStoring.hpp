@@ -149,7 +149,7 @@ class RecursiveDirectRankStoringMmphf {
             treeNode.minLCP = findMinLCP(begin, end, knownCommonPrefixLength);
 
             if (alphabetMaps.size() < 1 << LOG2_ALPHABET_MAPS_COUNT && layer <= 1 && nThisNode > DIRECT_RANK_STORING_THRESHOLD) {
-                AlphabetMap am(begin, end, treeNode.minLCP);
+                AlphabetMap am(begin, end, treeNode.minLCP, true, true);
                 if (!alphabetMaps.empty() && am.length64() == alphabetMaps[ancestorAlphabetMapIndex].length64()) {
                     treeNode.alphabetMapIndex = ancestorAlphabetMapIndex;
                 } else {
@@ -561,7 +561,7 @@ class RecursiveDirectRankStoringV2Mmphf {
 
             if (alphabetMaps.size() < 1 << LOG2_ALPHABET_MAPS_COUNT && layer <= 1 && nThisNode > DIRECT_RANK_STORING_THRESHOLD) {
                 size_t minLCP = *std::min_element(lcpsBegin + 1, lcpsEnd);
-                AlphabetMap am(begin, end, minLCP);
+                AlphabetMap am(begin, end, minLCP, true, true);
                 if (!alphabetMaps.empty() && am.length64() == alphabetMaps[ancestorAlphabetMapIndex].length64()) {
                     treeNode.alphabetMapIndex = ancestorAlphabetMapIndex;
                 } else {

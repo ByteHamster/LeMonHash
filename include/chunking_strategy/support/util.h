@@ -43,7 +43,7 @@ std::string toBinaryString(std::string &string) {
     return toBinaryString(string.c_str(), string.length());
 }
 
-size_t LCP(const std::string &s1, const std::string &s2) {
+size_t LCP(const auto &s1, const auto &s2) {
     size_t lcp = 0;
     size_t minLength = std::min(s1.length(), s2.length());
     auto s1ptr = s1.data();
@@ -129,24 +129,38 @@ public:
 
     AlphabetMap() = default;
 
-    /** Constructs from the alphabet of the strings in the given range. */
-    AlphabetMap(const auto begin, const auto end, bool includeTerminator = true) {
-        if (includeTerminator)
+    /** Constructs from the alphabet of the strings in the given range. If terminator is true, then '\0' is part of
+     * the alphabet. */
+    AlphabetMap(const auto begin, const auto end, bool terminator = true) {
+        if (terminator)
             bitMap[0] = 1;
         for (auto it = begin; it != end; ++it)
             for (uint8_t c : *it)
                 bitMap[c / 64] |= 1ull << (c % 64);
     }
 
-    /** Constructs from the alphabet of the strings in the given range, where only a substring of each string is
-     * considered. */
-    AlphabetMap(const auto begin, const auto end, size_t fromIndex, size_t toIndex = std::string_view::npos - 1,
-                bool includeTerminator = true) {
-        if (includeTerminator)
+    /** Constructs from the alphabet of the strings in the given range, where only a suffix of each string is
+     * considered.
+     * If branchingCharacters is true, then consider only the alphabet of branching characters in the compacted trie
+     * of the (suffixes of the) strings in the given range, which must be sorted lexicographically.
+     * If terminator is true, then '\0' is part of the alphabet. */
+    AlphabetMap(const auto begin, const auto end, size_t fromIndex, bool branchingCharacters, bool terminator = true) {
+        if (terminator)
             bitMap[0] = 1;
-        for (auto it = begin; it != end; ++it)
-            for (uint8_t c : std::string_view(*it).substr(fromIndex, std::min(toIndex + 1, it->size()) - fromIndex))
-                bitMap[c / 64] |= 1ull << (c % 64);
+
+        if (branchingCharacters) {
+            for (auto it = begin + 1; it != end; ++it) {
+                auto lcp = LCP(std::string_view(*it).substr(fromIndex), std::string_view(*(it - 1)).substr(fromIndex));
+                uint8_t c0 = (*std::prev(it))[fromIndex + lcp];
+                uint8_t c1 = (*it)[fromIndex + lcp];
+                bitMap[c0 / 64] |= 1ull << (c0 % 64);
+                bitMap[c1 / 64] |= 1ull << (c1 % 64);
+            }
+        } else {
+            for (auto it = begin; it != end; ++it)
+                for (uint8_t c: std::string_view(*it).substr(fromIndex))
+                    bitMap[c / 64] |= 1ull << (c % 64);
+        }
     }
 
     /** Returns the rank of a given character in the alphabet. */
@@ -155,6 +169,11 @@ public:
         for (auto i = 0; i < c / 64; i++)
             rank += std::popcount(bitMap[i]);
         return rank + std::popcount(bitMap[c / 64] & ((1ull << (c % 64)) - 1));
+    }
+
+    /** Returns true iff the given character is in the alphabet. */
+    bool contains(uint8_t c) const {
+        return bitMap[c / 64] & (1ull << (c % 64));
     }
 
     /** Returns true iff the given alphabet map is contained in this alphabet map. */
@@ -182,7 +201,7 @@ public:
         uint64_t chunk = 0;
         size_t i = 0;
         for (; i < characters && i < stringLength; i++)
-            chunk = chunk * sigma + rank(string[i]);
+            chunk = chunk * sigma + std::min<uint8_t>(rank(string[i]), sigma - 1);
         for (; i < characters; i++)
             chunk *= sigma;
         return chunk;
@@ -195,7 +214,7 @@ public:
         uint64_t chunk = 0;
         size_t i = 0;
         for (; i < characters && i < indexes.size() && indexes[i] < stringLength; i++)
-            chunk = chunk * sigma + rank(string[indexes[i]]);
+            chunk = chunk * sigma + std::min<uint8_t>(rank(string[indexes[i]]), sigma - 1);
         for (; i < characters; i++)
             chunk *= sigma;
         return chunk;
