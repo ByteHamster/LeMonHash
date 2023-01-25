@@ -121,22 +121,35 @@ uint64_t readChunk(const char *string, size_t stringLength, Iterator indexesBegi
     return chunk;
 }
 
-/** Stores a subset of the alphabet of 1-byte values [0, 1, ..., 255]. */
-class AlphabetMap {
-    uint64_t bitMap[4] = {0, 0, 0, 0};
+/** Stores a subset of the alphabet of 7-bit or 8-bit values (depending on whether ASCII is true). */
+template<bool ASCII=false>
+struct AlphabetMap {
+    static constexpr uint8_t words = ASCII ? 2 : 4;
+    uint64_t bitMap[words] = {0};
+
+    void set(uint8_t c) {
+        if constexpr (ASCII)
+            assert(c < 128);
+        bitMap[c / 64] |= uint64_t(1) << (c % 64);
+    }
 
 public:
 
     AlphabetMap() = default;
 
+    AlphabetMap(uint64_t other[words]) {
+        for (uint8_t i = 0; i < words; i++)
+            bitMap[i] = other[i];
+    }
+
     /** Constructs from the alphabet of the strings in the given range. If terminator is true, then '\0' is part of
      * the alphabet. */
     AlphabetMap(const auto begin, const auto end, bool terminator = true) {
         if (terminator)
-            bitMap[0] = 1;
+            set(0);
         for (auto it = begin; it != end; ++it)
             for (uint8_t c : *it)
-                bitMap[c / 64] |= 1ull << (c % 64);
+                set(c);
     }
 
     /** Constructs from the alphabet of the strings in the given range, where only a suffix of each string is
@@ -146,25 +159,27 @@ public:
      * If terminator is true, then '\0' is part of the alphabet. */
     AlphabetMap(const auto begin, const auto end, size_t fromIndex, bool branchingCharacters, bool terminator = true) {
         if (terminator)
-            bitMap[0] = 1;
+            set(0);
 
         if (branchingCharacters) {
             for (auto it = begin + 1; it != end; ++it) {
                 auto lcp = LCP(std::string_view(*it).substr(fromIndex), std::string_view(*(it - 1)).substr(fromIndex));
                 uint8_t c0 = (*std::prev(it))[fromIndex + lcp];
                 uint8_t c1 = (*it)[fromIndex + lcp];
-                bitMap[c0 / 64] |= 1ull << (c0 % 64);
-                bitMap[c1 / 64] |= 1ull << (c1 % 64);
+                set(c0);
+                set(c1);
             }
         } else {
             for (auto it = begin; it != end; ++it)
                 for (uint8_t c: std::string_view(*it).substr(fromIndex))
-                    bitMap[c / 64] |= 1ull << (c % 64);
+                    set(c);
         }
     }
 
     /** Returns the rank of a given character in the alphabet. */
     uint8_t rank(uint8_t c) const {
+        if constexpr (ASCII)
+            c = c < 128 ? c : 127;
         auto rank = 0;
         for (auto i = 0; i < c / 64; i++)
             rank += std::popcount(bitMap[i]);
@@ -173,20 +188,38 @@ public:
 
     /** Returns true iff the given character is in the alphabet. */
     bool contains(uint8_t c) const {
+        if constexpr (ASCII) {
+            if (c >= 128)
+                return false;
+        }
         return bitMap[c / 64] & (1ull << (c % 64));
     }
 
     /** Returns true iff the given alphabet map is contained in this alphabet map. */
-    bool contains(const AlphabetMap &other) const {
-        for (auto i = 0; i < 4; i++)
+    bool contains(const AlphabetMap<ASCII> &other) const {
+        for (auto i = 0; i < words; i++)
             if ((bitMap[i] & other.bitMap[i]) != other.bitMap[i])
                 return false;
         return true;
     }
 
+    /** Returns true iff the alphabet is a subset of ASCII. */
+    bool isAscii() const {
+        if constexpr (ASCII)
+            return true;
+        return bitMap[2] == 0 && bitMap[3] == 0;
+    }
+
+    /** Returns the ASCII version of this alphabet map. */
+    AlphabetMap<true> toAscii() const {
+        assert(isAscii());
+        uint64_t a[2] = {bitMap[0], bitMap[1]};
+        return {a};
+    }
+
     /** Returns the number of characters in the alphabet. */
     uint8_t size() const {
-        return std::accumulate(bitMap, bitMap + 4, 0, [](auto a, auto b) { return a + std::popcount(b); });
+        return std::accumulate(bitMap, bitMap + words, 0, [](auto a, auto b) { return a + std::popcount(b); });
     }
 
     /** Returns the length of the longest string from this alphabet that can be fit in a 64-bit integer. */
@@ -218,5 +251,64 @@ public:
         for (; i < characters; i++)
             chunk *= sigma;
         return chunk;
+    }
+};
+
+class AlphabetMapsCollection {
+    std::vector<AlphabetMap<true>> maps7;
+    std::vector<AlphabetMap<false>> maps8;
+
+public:
+
+    AlphabetMapsCollection() = default;
+
+    uint64_t pushBack(const AlphabetMap<false> &map) {
+        if (map.isAscii()) {
+            maps7.emplace_back(map.toAscii());
+            return (maps7.size() - 1) << 1;
+        }
+
+        maps8.emplace_back(map);
+        return ((maps8.size() - 1) << 1) | 1;
+    }
+
+    bool isFullForBits(uint8_t mapIndexBits) const {
+        auto maxIndex = (1ull << (mapIndexBits - 1)) - 1;
+        return maps7.size() >= maxIndex || maps8.size() >= maxIndex;
+    }
+
+    uint8_t length64(uint64_t mapIndex) const {
+        if (mapIndex & 1)
+            return maps8[mapIndex >> 1].length64();
+        return maps7[mapIndex >> 1].length64();
+    }
+
+    uint64_t readChunk(uint64_t mapIndex, const char *string, size_t stringLength) const {
+        if (mapIndex & 1)
+            return maps8[mapIndex >> 1].readChunk(string, stringLength);
+        return maps7[mapIndex >> 1].readChunk(string, stringLength);
+    }
+
+    uint64_t readChunk(uint64_t mapIndex, const char *string, size_t stringLength, const auto &indexes) const {
+        if (mapIndex & 1)
+            return maps8[mapIndex >> 1].readChunk(string, stringLength, indexes);
+        return maps7[mapIndex >> 1].readChunk(string, stringLength, indexes);
+    }
+
+    std::pair<size_t, size_t> size() const {
+        return {maps7.size(), maps8.size()};
+    }
+
+    bool empty() const {
+        return maps7.empty() && maps8.empty();
+    }
+
+    size_t sizeInBytes() const {
+        return maps7.size() * sizeof(maps7[0]) + maps8.size() * sizeof(maps8[0]);
+    }
+
+    void shrinkToFit() {
+        maps7.shrink_to_fit();
+        maps8.shrink_to_fit();
     }
 };

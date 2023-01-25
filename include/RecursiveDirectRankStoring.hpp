@@ -51,17 +51,21 @@ class RecursiveDirectRankStoringMmphf {
         // For some more it is not explicitly cheaper but given that the ranks are "perfect", it is still worth it.
         static constexpr size_t CHUNK_DIRECT_RANK_STORING_THRESHOLD = 128;
 
-        static constexpr size_t LOG2_ALPHABET_MAPS_COUNT = 10;
+        static constexpr size_t ALPHABET_MAPS_THRESHOLD = 512;
+
+        static constexpr size_t LOG2_ALPHABET_MAPS_COUNT = 18;
 
         const std::string PATH_ROOT = "root";
 
         struct TreeNode {
             static constexpr bool useIndirection = sizeof(BucketMapperType) > 8;
+            static constexpr uint8_t offsetsOffsetBits = 48 - LOG2_ALPHABET_MAPS_COUNT;
+
             union {
                 std::conditional_t<useIndirection, BucketMapperType *, BucketMapperType> bucketMapper;
                 size_t numChildren = 0;
             };
-            size_t offsetsOffset : 48 - LOG2_ALPHABET_MAPS_COUNT = 0;
+            size_t offsetsOffset : offsetsOffsetBits = 0;
             size_t alphabetMapIndex : LOG2_ALPHABET_MAPS_COUNT;
             size_t minLCP : 15 = ((1 << 15) - 1);
             bool directRankStoring : 1 = false;
@@ -117,7 +121,7 @@ class RecursiveDirectRankStoringMmphf {
         std::unordered_map<std::string, TreeNode> treeNodes; // TODO: Use perfect hashing
         std::vector<PartitionedEliasFano *> bucketOffsets;
         std::vector<std::vector<size_t>> bucketOffsetsInput;
-        std::vector<AlphabetMap> alphabetMaps;
+        AlphabetMapsCollection alphabetMaps;
     public:
         explicit RecursiveDirectRankStoringMmphf(const std::vector<std::string> &strings) {
             N = strings.size();
@@ -130,7 +134,7 @@ class RecursiveDirectRankStoringMmphf {
             }
             bucketOffsetsInput.clear();
             bucketOffsetsInput.shrink_to_fit();
-            alphabetMaps.shrink_to_fit();
+            alphabetMaps.shrinkToFit();
 
             //std::ofstream myfile("tree.dot");
             //exportTreeStructure(myfile);
@@ -141,22 +145,21 @@ class RecursiveDirectRankStoringMmphf {
                            size_t offset, const std::string &path, size_t layer, size_t ancestorAlphabetMapIndex) {
             size_t nThisNode = std::distance(begin, end);
 
-            TreeNode treeNode;
-            if (bucketOffsetsInput.size() <= layer) {
+            if (bucketOffsetsInput.size() <= layer)
                 bucketOffsetsInput.resize(layer + 1);
-            }
+            if (bucketOffsetsInput.at(layer).size() > size_t(1) << TreeNode::offsetsOffsetBits)
+                throw std::runtime_error("Increase offsetsOffsetBits");
+
+            TreeNode treeNode;
             treeNode.offsetsOffset = bucketOffsetsInput.at(layer).size();
             treeNode.minLCP = findMinLCP(begin, end, knownCommonPrefixLength);
 
-            if (alphabetMaps.size() < 1 << LOG2_ALPHABET_MAPS_COUNT && layer <= 1 && nThisNode > DIRECT_RANK_STORING_THRESHOLD) {
+            if (!alphabetMaps.isFullForBits(LOG2_ALPHABET_MAPS_COUNT) && nThisNode > ALPHABET_MAPS_THRESHOLD) {
                 AlphabetMap am(begin, end, treeNode.minLCP, true, true);
-                if (!alphabetMaps.empty() && am.length64() == alphabetMaps[ancestorAlphabetMapIndex].length64()) {
+                if (!alphabetMaps.empty() && am.length64() == alphabetMaps.length64(ancestorAlphabetMapIndex)) {
                     treeNode.alphabetMapIndex = ancestorAlphabetMapIndex;
                 } else {
-                    treeNode.alphabetMapIndex = alphabetMaps.size();
-                    alphabetMaps.push_back(am);
-//                    std::cout << "layer=" << layer << " chunkSize=" << (int) am.length64()
-//                              << " alphabetSize=" << (int) alphabetMaps.back().size() << std::endl;
+                    treeNode.alphabetMapIndex = alphabetMaps.pushBack(am);
                 }
             } else {
                 treeNode.alphabetMapIndex = ancestorAlphabetMapIndex;
@@ -246,8 +249,7 @@ class RecursiveDirectRankStoringMmphf {
         }
 
         uint64_t extractChunk(const std::string &s, const TreeNode &treeNode) {
-            auto &alphabetMap = alphabetMaps.at(treeNode.alphabetMapIndex);
-            return alphabetMap.readChunk(s.c_str() + treeNode.minLCP, s.length() - treeNode.minLCP);
+            return alphabetMaps.readChunk(treeNode.alphabetMapIndex, s.c_str() + treeNode.minLCP, s.length() - treeNode.minLCP);
         }
 
         void extractChunks(const auto begin, const auto end, std::vector<uint64_t> &chunks, const TreeNode &treeNode) {
@@ -303,7 +305,9 @@ class RecursiveDirectRankStoringMmphf {
             std::cout<<"Bucket offsets:      "<<1.0 * std::accumulate(bucketOffsets.begin(), bucketOffsets.end(), 0,
                                                                       [] (size_t size, PartitionedEliasFano *fano) { return size + fano->bit_size(); }) / N<<std::endl;
             std::cout<<"Tree node data:      "<<(8.0 * treeNodes.size() * sizeof(TreeNode) + 3.0 * treeNodes.size())/N<<std::endl;
-            std::cout<<"Alphabet maps:       "<<8.0 * alphabetMaps.size() * sizeof(AlphabetMap) / N<<std::endl;
+            std::cout<<"Alphabet maps:       "<<8.0 * alphabetMaps.sizeInBytes() / N<<std::endl;
+            std::cout<<"7-bit alphabets:     "<<alphabetMaps.size().first<<std::endl;
+            std::cout<<"8-bit alphabets:     "<<alphabetMaps.size().second<<std::endl;
             std::cout<<"Height:              "<<bucketOffsets.size()<<std::endl;
             std::cout<<"Nodes:               "<<treeNodes.size()<<std::endl;
 
@@ -315,7 +319,7 @@ class RecursiveDirectRankStoringMmphf {
                                           [] (size_t size, PartitionedEliasFano *fano) { return size + fano->bit_size(); })
                         + 8 * std::accumulate(treeNodes.begin(), treeNodes.end(), 0,
                                               [] (size_t size, auto &node) { return size + node.second.size(); })
-                        + 8 * alphabetMaps.size() * sizeof(AlphabetMap)
+                        + 8 * alphabetMaps.sizeInBytes()
                         + 3 * treeNodes.size(); // Use an MPHF instead of std::unordered_map
         }
 
@@ -396,7 +400,9 @@ class RecursiveDirectRankStoringV2Mmphf {
 
         static constexpr size_t CHUNK_DIRECT_RANK_STORING_THRESHOLD = 128;
 
-        static constexpr size_t LOG2_ALPHABET_MAPS_COUNT = 10;
+        static constexpr size_t ALPHABET_MAPS_THRESHOLD = 512;
+
+        static constexpr size_t LOG2_ALPHABET_MAPS_COUNT = 18;
 
         const std::string PATH_ROOT = "root";
 
@@ -525,7 +531,7 @@ class RecursiveDirectRankStoringV2Mmphf {
         std::unordered_map<std::string, TreeNode> treeNodes; // TODO: Use perfect hashing
         std::vector<PartitionedEliasFano *> bucketOffsets;
         std::vector<std::vector<size_t>> bucketOffsetsInput;
-        std::vector<AlphabetMap> alphabetMaps;
+        AlphabetMapsCollection alphabetMaps;
 
     public:
         explicit RecursiveDirectRankStoringV2Mmphf(const std::vector<std::string> &strings) {
@@ -540,7 +546,7 @@ class RecursiveDirectRankStoringV2Mmphf {
             }
             bucketOffsetsInput.clear();
             bucketOffsetsInput.shrink_to_fit();
-            alphabetMaps.shrink_to_fit();
+            alphabetMaps.shrinkToFit();
             //std::ofstream myfile("tree2.dot");
             //exportTreeStructure(myfile);
             //myfile.close();
@@ -559,28 +565,25 @@ class RecursiveDirectRankStoringV2Mmphf {
             TreeNode treeNode;
             treeNode.offsetsOffset = bucketOffsetsInput.at(layer).size();
 
-            if (alphabetMaps.size() < 1 << LOG2_ALPHABET_MAPS_COUNT && layer <= 1 && nThisNode > DIRECT_RANK_STORING_THRESHOLD) {
+            if (!alphabetMaps.isFullForBits(LOG2_ALPHABET_MAPS_COUNT) && nThisNode > ALPHABET_MAPS_THRESHOLD) {
                 size_t minLCP = *std::min_element(lcpsBegin + 1, lcpsEnd);
                 AlphabetMap am(begin, end, minLCP, true, true);
-                if (!alphabetMaps.empty() && am.length64() == alphabetMaps[ancestorAlphabetMapIndex].length64()) {
+                if (!alphabetMaps.empty() && am.length64() == alphabetMaps.length64(ancestorAlphabetMapIndex)) {
                     treeNode.alphabetMapIndex = ancestorAlphabetMapIndex;
                 } else {
-                    treeNode.alphabetMapIndex = alphabetMaps.size();
-                    alphabetMaps.push_back(am);
-//                    std::cout << "layer=" << layer << " chunkSize=" << (int) am.length64()
-//                              << " alphabetSize=" << (int) alphabetMaps.back().size() << std::endl;
+                    treeNode.alphabetMapIndex = alphabetMaps.pushBack(am);
                 }
             } else {
                 treeNode.alphabetMapIndex = ancestorAlphabetMapIndex;
             }
 
-            auto maxIndexesCount = alphabetMaps[treeNode.alphabetMapIndex].length64();
+            auto maxIndexesCount = alphabetMaps.length64(treeNode.alphabetMapIndex);
             auto minima = distinctMinima(lcpsBegin + 1, lcpsEnd, maxIndexesCount, knownCommonPrefixLength);
             auto indexes = treeNode.storeIndexes(minima, maxIndexesCount);
             assert(indexes == treeNode.getIndexes(maxIndexesCount));
 
             std::vector<uint64_t> chunks;
-            extractChunks(begin, end, chunks, indexes, alphabetMaps[treeNode.alphabetMapIndex]);
+            extractChunks(begin, end, chunks, indexes, treeNode.alphabetMapIndex);
             assert(chunks.size() >= 2); // If all were the same, we would have not cut off enough
 
             auto tryPgmMapper = chunks.size() > CHUNK_DIRECT_RANK_STORING_THRESHOLD;
@@ -600,7 +603,7 @@ class RecursiveDirectRankStoringV2Mmphf {
                     size_t bucketSizePrefixTemp = 0;
 
                     treeNode.getBucketMapper().bucketOf(chunks.begin(), chunks.end(), [&](auto chunks_it, size_t bucket) {
-                        while (it != end && readChunk(*it, indexes, alphabetMaps[treeNode.alphabetMapIndex]) < *chunks_it)
+                        while (it != end && readChunk(*it, indexes, treeNode.alphabetMapIndex) < *chunks_it)
                             ++it;
                         while (prev_bucket < bucket) {
                             constructChild(currentBucketBegin, it,
@@ -634,7 +637,7 @@ class RecursiveDirectRankStoringV2Mmphf {
                 for (size_t chunk = 0; chunk < chunks.size(); chunk++) {
                     uint64_t chunkValue = chunks.at(chunk);
                     auto currentBucketBegin = it;
-                    while (it != end && readChunk(*it, indexes, alphabetMaps[treeNode.alphabetMapIndex]) == chunkValue)
+                    while (it != end && readChunk(*it, indexes, treeNode.alphabetMapIndex) == chunkValue)
                         ++it;
                     std::string key = "Chunk" + path + "/" + std::to_string(chunkValue);
                     retrieval.addInput(chunks.size(), key, chunk);
@@ -649,16 +652,16 @@ class RecursiveDirectRankStoringV2Mmphf {
             treeNodes.emplace(path, std::move(treeNode));
         }
 
-        uint64_t readChunk(const std::string &s, const auto &indexes, const AlphabetMap &alphabetMap) const {
-            return alphabetMap.readChunk(s.c_str(), s.length(), indexes);
+        uint64_t readChunk(const std::string &s, const auto &indexes, size_t alphabetMapIndex) const {
+            return alphabetMaps.readChunk(alphabetMapIndex, s.c_str(), s.length(), indexes);
         }
 
         void extractChunks(const auto begin, const auto end, std::vector<uint64_t> &chunks, const auto &indexes,
-                           const AlphabetMap &alphabetMap) {
+                           size_t alphabetMapIndex) {
             uint64_t previousChunk = 0;
             auto it = begin;
             while (it != end) {
-                uint64_t chunk = readChunk(*it, indexes, alphabetMap);
+                uint64_t chunk = readChunk(*it, indexes, alphabetMapIndex);
                 assert(chunk >= previousChunk);
                 if (chunk != previousChunk || chunks.empty()) {
                     chunks.push_back(chunk);
@@ -707,7 +710,9 @@ class RecursiveDirectRankStoringV2Mmphf {
             std::cout<<"Bucket offsets:      "<<1.0 * std::accumulate(bucketOffsets.begin(), bucketOffsets.end(), 0,
                                                                       [] (size_t size, PartitionedEliasFano *fano) { return size + fano->bit_size(); }) / N<<std::endl;
             std::cout<<"Tree node data:      "<<(8.0 * treeNodes.size() * sizeof(TreeNode) + 3.0 * treeNodes.size())/N<<std::endl;
-            std::cout<<"Alphabet maps:       "<<8.0 * alphabetMaps.size() * sizeof(AlphabetMap) / N<<std::endl;
+            std::cout<<"Alphabet maps:       "<<8.0 * alphabetMaps.sizeInBytes() / N<<std::endl;
+            std::cout<<"7-bit alphabets:     "<<alphabetMaps.size().first<<std::endl;
+            std::cout<<"8-bit alphabets:     "<<alphabetMaps.size().second<<std::endl;
             std::cout<<"Height:              "<<bucketOffsets.size()<<std::endl;
             std::cout<<"Nodes:               "<<treeNodes.size()<<std::endl;
 
@@ -719,7 +724,7 @@ class RecursiveDirectRankStoringV2Mmphf {
                                           [] (size_t size, PartitionedEliasFano *fano) { return size + fano->bit_size(); })
                         + 8 * std::accumulate(treeNodes.begin(), treeNodes.end(), 0,
                                               [] (size_t size, auto &node) { return size + node.second.size(); })
-                        + 8 * alphabetMaps.size() * sizeof(AlphabetMap)
+                        + 8 * alphabetMaps.sizeInBytes()
                         + 3 * treeNodes.size(); // Use an MPHF instead of std::unordered_map
         }
 
@@ -765,9 +770,8 @@ class RecursiveDirectRankStoringV2Mmphf {
             TreeNode *node = &treeNodes.at(path);
             size_t layer = 0;
             while (true) {
-                auto &alphabetMap = alphabetMaps.at(node->alphabetMapIndex);
-                auto indexes = node->getIndexes(alphabetMap.length64());
-                uint64_t chunk = readChunk(string, indexes, alphabetMap);
+                auto indexes = node->getIndexes(alphabetMaps.length64(node->alphabetMapIndex));
+                uint64_t chunk = readChunk(string, indexes, node->alphabetMapIndex);
                 size_t bucket;
 
                 if (node->directRankStoring) {
