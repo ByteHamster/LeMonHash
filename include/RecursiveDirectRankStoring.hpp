@@ -199,9 +199,7 @@ class RecursiveDirectRankStoringMmphf {
                     treeNode.destroyBucketMapper();
                     tryPgmMapper = false;
                 } else {
-                    size_t numBuckets = treeNode.getBucketMapper().numBuckets();
-                    assert(numBuckets >= 2);
-
+                    assert(treeNode.getBucketMapper().numBuckets() >= 2);
                     auto currentBucketBegin = begin;
                     auto currentBucketEnd = begin;
                     size_t prevBucket = 0;
@@ -217,13 +215,9 @@ class RecursiveDirectRankStoringMmphf {
                             prevBucket++;
                         }
                     });
-                    currentBucketEnd = end;
-                    while (prevBucket < numBuckets) {
-                        constructChild(currentBucketBegin, currentBucketEnd, offset + bucketSizePrefixTemp,
+                    if (currentBucketBegin != end) {
+                        constructChild(currentBucketBegin, end, offset + bucketSizePrefixTemp,
                                        treeNode.minLCP, path, prevBucket, layer, treeNode.alphabetMapIndex);
-                        bucketSizePrefixTemp += std::distance(currentBucketBegin, currentBucketEnd);
-                        currentBucketBegin = currentBucketEnd;
-                        prevBucket++;
                     }
                 }
             }
@@ -645,9 +639,7 @@ class RecursiveDirectRankStoringV2Mmphf {
                     treeNode.destroyBucketMapper();
                     tryPgmMapper = false;
                 } else {
-                    size_t numBuckets = treeNode.getBucketMapper().numBuckets();
-                    assert(numBuckets >= 2);
-
+                    assert(treeNode.getBucketMapper().numBuckets() >= 2);
                     auto currentBucketBegin = begin;
                     auto currentBucketEnd = begin;
                     size_t prevBucket = 0;
@@ -665,15 +657,11 @@ class RecursiveDirectRankStoringV2Mmphf {
                             prevBucket++;
                         }
                     });
-                    currentBucketEnd = end;
-                    while (prevBucket < numBuckets) {
-                        constructChild(currentBucketBegin, currentBucketEnd,
-                                       lcpsBegin + (currentBucketBegin - begin), lcpsBegin + (currentBucketEnd - begin),
+                    if (currentBucketBegin != end) {
+                        constructChild(currentBucketBegin, end,
+                                       lcpsBegin + (currentBucketBegin - begin), lcpsBegin + (end - begin),
                                        offset + bucketSizePrefixTemp, indexes[0], path, prevBucket, layer,
                                        treeNode.alphabetMapIndex);
-                        bucketSizePrefixTemp += std::distance(currentBucketBegin, currentBucketEnd);
-                        currentBucketBegin = currentBucketEnd;
-                        prevBucket++;
                     }
                 }
             }
