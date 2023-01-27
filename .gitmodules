@@ -7,3 +7,6 @@
 [submodule "extlib/ds2i"]
 	path = extlib/ds2i
 	url = git@github.com:ByteHamster-etc/ds2i.git
+[submodule "extlib/sicHash"]
+	path = extlib/sicHash
+	url = git@github.com:ByteHamster/SicHash.git
