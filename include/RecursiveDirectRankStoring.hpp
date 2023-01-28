@@ -130,7 +130,10 @@ class RecursiveDirectRankStoringMmphf {
     public:
         explicit RecursiveDirectRankStoringMmphf(const std::vector<std::string> &strings) {
             N = strings.size();
-            constructNode(strings.begin(), strings.end(), 0, 0, PATH_ROOT, 0, 0);
+            {
+                auto lcps = computeLCPs(strings.begin(), strings.end());
+                constructNode(strings.begin(), strings.end(), lcps.begin(), 0, PATH_ROOT, 0, 0);
+            }
             retrieval.build();
 
             for (auto &v : bucketOffsetsInput) {
@@ -142,6 +145,7 @@ class RecursiveDirectRankStoringMmphf {
             alphabetMaps.shrinkToFit();
 
             std::vector<std::string> mphfInput;
+            mphfInput.reserve(treeNodesInput.size());
             for (auto &pair : treeNodesInput) {
                 mphfInput.emplace_back(pair.first);
             }
@@ -164,8 +168,8 @@ class RecursiveDirectRankStoringMmphf {
             //myfile.close();
         }
     private:
-        void constructNode(const auto begin, const auto end, const size_t knownCommonPrefixLength,
-                           size_t offset, const std::string &path, size_t layer, size_t ancestorAlphabetMapIndex) {
+        void constructNode(const auto begin, const auto end, const auto lcpsBegin, size_t offset,
+                           const std::string &path, size_t layer, size_t ancestorAlphabetMapIndex) {
             size_t nThisNode = std::distance(begin, end);
 
             if (bucketOffsetsInput.size() <= layer)
@@ -175,10 +179,10 @@ class RecursiveDirectRankStoringMmphf {
 
             TreeNode treeNode;
             treeNode.offsetsOffset = bucketOffsetsInput.at(layer).size();
-            treeNode.minLCP = findMinLCP(begin, end, knownCommonPrefixLength);
+            treeNode.minLCP = *std::min_element(lcpsBegin + 1, lcpsBegin + nThisNode);
 
             if (!alphabetMaps.isFullForBits(LOG2_ALPHABET_MAPS_COUNT) && nThisNode > ALPHABET_MAPS_THRESHOLD) {
-                AlphabetMap am(begin, end, treeNode.minLCP, true, true);
+                AlphabetMap am(begin, end, lcpsBegin);
                 if (!alphabetMaps.empty() && am.length64() == alphabetMaps.length64(ancestorAlphabetMapIndex)) {
                     treeNode.alphabetMapIndex = ancestorAlphabetMapIndex;
                 } else {
@@ -188,7 +192,7 @@ class RecursiveDirectRankStoringMmphf {
                 treeNode.alphabetMapIndex = ancestorAlphabetMapIndex;
             }
 
-            auto [chunks, chunksOffsets] = extractChunks(begin, end, treeNode);
+            auto [chunks, chunksOffsets] = extractChunks(begin, end, lcpsBegin, treeNode);
             assert(chunks.size() >= 2); // If all were the same, we would have not cut off enough
 
             auto tryPgmMapper = chunks.size() > CHUNK_DIRECT_RANK_STORING_THRESHOLD;
@@ -208,16 +212,18 @@ class RecursiveDirectRankStoringMmphf {
                     mapper.bucketOf(chunks.begin(), chunks.end(), [&](auto chunks_it, size_t bucket) {
                         currentBucketEnd = begin + chunksOffsets.at(chunks_it - chunks.begin());
                         while (prevBucket < bucket) {
-                            constructChild(currentBucketBegin, currentBucketEnd, offset + bucketSizePrefixTemp,
-                                           treeNode.minLCP, path, prevBucket, layer, treeNode.alphabetMapIndex);
+                            constructChild(currentBucketBegin, currentBucketEnd,
+                                           lcpsBegin + (currentBucketBegin - begin), offset + bucketSizePrefixTemp,
+                                           path, prevBucket, layer, treeNode.alphabetMapIndex);
                             bucketSizePrefixTemp += std::distance(currentBucketBegin, currentBucketEnd);
                             currentBucketBegin = currentBucketEnd;
                             prevBucket++;
                         }
                     });
                     if (currentBucketBegin != end) {
-                        constructChild(currentBucketBegin, end, offset + bucketSizePrefixTemp,
-                                       treeNode.minLCP, path, prevBucket, layer, treeNode.alphabetMapIndex);
+                        constructChild(currentBucketBegin, end, lcpsBegin + (currentBucketBegin - begin),
+                                       offset + bucketSizePrefixTemp, path, prevBucket, layer,
+                                       treeNode.alphabetMapIndex);
                     }
                 }
             }
@@ -234,8 +240,8 @@ class RecursiveDirectRankStoringMmphf {
                     currentBucketEnd = begin + chunksOffsets[chunk + 1];
                     std::string key = "Chunk" + path + "/" + std::to_string(chunkValue);
                     retrieval.addInput(chunks.size(), key, chunk);
-                    constructChild(currentBucketBegin, currentBucketEnd, offset + bucketSizePrefixTemp, treeNode.minLCP,
-                                   path, chunk, layer, treeNode.alphabetMapIndex);
+                    constructChild(currentBucketBegin, currentBucketEnd, lcpsBegin + (currentBucketBegin - begin),
+                                   offset + bucketSizePrefixTemp, path, chunk, layer, treeNode.alphabetMapIndex);
                     bucketSizePrefixTemp += std::distance(currentBucketBegin, currentBucketEnd);
                 }
             }
@@ -266,27 +272,30 @@ class RecursiveDirectRankStoringMmphf {
             return alphabetMaps.readChunk(treeNode.alphabetMapIndex, s.c_str() + treeNode.minLCP, s.length() - treeNode.minLCP);
         }
 
-        auto extractChunks(const auto begin, const auto end, const TreeNode &treeNode) {
-            std::vector<uint64_t> chunks;
-            std::vector<uint32_t> chunksOffsets;
-            uint64_t previousChunk = 0;
-            auto it = begin;
-            while (it != end) {
-                uint64_t chunk = extractChunk(*it, treeNode);
-                assert(chunk >= previousChunk);
-                if (chunk != previousChunk || chunks.empty()) {
+        auto extractChunks(const auto begin, const auto end, const auto lcpsBegin, const TreeNode &treeNode) {
+            auto chunkWidth = alphabetMaps.length64(treeNode.alphabetMapIndex);
+            auto previousChunk = extractChunk(*begin, treeNode);
+
+            std::vector<uint64_t> chunks = {previousChunk};
+            std::vector<uint32_t> chunksOffsets = {0};
+
+            auto itLcps = lcpsBegin + 1;
+            for (auto it = begin + 1; it != end; ++it, ++itLcps) {
+                bool isChunkDistinct = *itLcps - treeNode.minLCP < chunkWidth;
+                if (isChunkDistinct) {
+                    uint64_t chunk = extractChunk(*it, treeNode);
+                    assert(chunk >= previousChunk);
                     chunks.push_back(chunk);
                     chunksOffsets.push_back(std::distance(begin, it));
                     previousChunk = chunk;
                 }
-                it++;
             }
             chunksOffsets.push_back(std::distance(begin, end));
             return std::make_pair(chunks, chunksOffsets);
         }
 
-        void constructChild(auto begin, auto end, size_t offset, size_t minLCP, const std::string &path, size_t bucket,
-                            size_t layer, size_t ancestorAlphabetMapIndex) {
+        void constructChild(auto begin, auto end, auto lcpsBegin, size_t offset, const std::string &path,
+                            size_t bucket, size_t layer, size_t ancestorAlphabetMapIndex) {
             bucketOffsetsInput.at(layer).push_back(offset);
             size_t currentBucketSize = std::distance(begin, end);
             if (currentBucketSize <= 1) {
@@ -302,7 +311,7 @@ class RecursiveDirectRankStoringMmphf {
                 }
             } else {
                 // Recurse
-                constructNode(begin, end, minLCP, offset, path + "/" + std::to_string(bucket), layer + 1,
+                constructNode(begin, end, lcpsBegin, offset, path + "/" + std::to_string(bucket), layer + 1,
                               ancestorAlphabetMapIndex);
             }
         }
@@ -563,8 +572,10 @@ class RecursiveDirectRankStoringV2Mmphf {
     public:
         explicit RecursiveDirectRankStoringV2Mmphf(const std::vector<std::string> &strings) {
             N = strings.size();
-            auto lcps = computeLCPs(strings.begin(), strings.end());
-            constructNode(strings.begin(), strings.end(), lcps.begin(), lcps.end(), 0, 0, PATH_ROOT, 0, 0);
+            {
+                auto lcps = computeLCPs(strings.begin(), strings.end());
+                constructNode(strings.begin(), strings.end(), lcps.begin(), 0, 0, PATH_ROOT, 0, 0);
+            }
             retrieval.build();
 
             for (auto &v : bucketOffsetsInput) {
@@ -598,9 +609,8 @@ class RecursiveDirectRankStoringV2Mmphf {
             //myfile.close();
         }
     private:
-        void constructNode(const auto begin, const auto end, const auto lcpsBegin, const auto lcpsEnd,
-                           const size_t knownCommonPrefixLength, size_t offset, const std::string &path, size_t layer,
-                           size_t ancestorAlphabetMapIndex) {
+        void constructNode(const auto begin, const auto end, const auto lcpsBegin, const size_t knownCommonPrefixLength,
+                           size_t offset, const std::string &path, size_t layer, size_t ancestorAlphabetMapIndex) {
             size_t nThisNode = std::distance(begin, end);
 
             if (bucketOffsetsInput.size() <= layer)
@@ -612,8 +622,7 @@ class RecursiveDirectRankStoringV2Mmphf {
             treeNode.offsetsOffset = bucketOffsetsInput.at(layer).size();
 
             if (!alphabetMaps.isFullForBits(LOG2_ALPHABET_MAPS_COUNT) && nThisNode > ALPHABET_MAPS_THRESHOLD) {
-                size_t minLCP = *std::min_element(lcpsBegin + 1, lcpsEnd);
-                AlphabetMap am(begin, end, minLCP, true, true);
+                AlphabetMap am(begin, end, lcpsBegin);
                 if (!alphabetMaps.empty() && am.length64() == alphabetMaps.length64(ancestorAlphabetMapIndex)) {
                     treeNode.alphabetMapIndex = ancestorAlphabetMapIndex;
                 } else {
@@ -624,7 +633,7 @@ class RecursiveDirectRankStoringV2Mmphf {
             }
 
             auto maxIndexesCount = alphabetMaps.length64(treeNode.alphabetMapIndex);
-            auto minima = distinctMinima(lcpsBegin + 1, lcpsEnd, maxIndexesCount, knownCommonPrefixLength);
+            auto minima = distinctMinima(lcpsBegin + 1, lcpsBegin + nThisNode, maxIndexesCount, knownCommonPrefixLength);
             auto indexes = treeNode.storeIndexes(minima, maxIndexesCount);
             assert(indexes == treeNode.getIndexes(maxIndexesCount));
 
@@ -649,17 +658,15 @@ class RecursiveDirectRankStoringV2Mmphf {
                         currentBucketEnd = begin + chunksOffsets.at(chunks_it - chunks.begin());
                         while (prevBucket < bucket) {
                             constructChild(currentBucketBegin, currentBucketEnd,
-                                           lcpsBegin + (currentBucketBegin - begin), lcpsBegin + (currentBucketEnd - begin),
-                                           offset + bucketSizePrefixTemp, indexes[0], path, prevBucket, layer,
-                                           treeNode.alphabetMapIndex);
+                                           lcpsBegin + (currentBucketBegin - begin), offset + bucketSizePrefixTemp,
+                                           indexes[0], path, prevBucket, layer, treeNode.alphabetMapIndex);
                             bucketSizePrefixTemp += std::distance(currentBucketBegin, currentBucketEnd);
                             currentBucketBegin = currentBucketEnd;
                             prevBucket++;
                         }
                     });
                     if (currentBucketBegin != end) {
-                        constructChild(currentBucketBegin, end,
-                                       lcpsBegin + (currentBucketBegin - begin), lcpsBegin + (end - begin),
+                        constructChild(currentBucketBegin, end, lcpsBegin + (currentBucketBegin - begin),
                                        offset + bucketSizePrefixTemp, indexes[0], path, prevBucket, layer,
                                        treeNode.alphabetMapIndex);
                     }
@@ -678,8 +685,7 @@ class RecursiveDirectRankStoringV2Mmphf {
                     currentBucketEnd = begin + chunksOffsets[chunk + 1];
                     std::string key = "Chunk" + path + "/" + std::to_string(chunkValue);
                     retrieval.addInput(chunks.size(), key, chunk);
-                    constructChild(currentBucketBegin, currentBucketEnd,
-                                   lcpsBegin + (currentBucketBegin - begin), lcpsBegin + (currentBucketEnd - begin),
+                    constructChild(currentBucketBegin, currentBucketEnd, lcpsBegin + (currentBucketBegin - begin),
                                    offset + bucketSizePrefixTemp, indexes[0], path, chunk, layer,
                                    treeNode.alphabetMapIndex);
                     bucketSizePrefixTemp += std::distance(currentBucketBegin, currentBucketEnd);
@@ -712,7 +718,7 @@ class RecursiveDirectRankStoringV2Mmphf {
             return std::make_pair(chunks, chunksOffsets);
         }
 
-        void constructChild(auto begin, auto end, auto lcpsBegin, auto lcpsEnd, size_t offset, size_t minLCP,
+        void constructChild(auto begin, auto end, auto lcpsBegin, size_t offset, size_t minLCP,
                             const std::string &path, size_t bucket, size_t layer, size_t ancestorAlphabetMapIndex) {
             bucketOffsetsInput.at(layer).push_back(offset);
             size_t currentBucketSize = std::distance(begin, end);
@@ -729,7 +735,7 @@ class RecursiveDirectRankStoringV2Mmphf {
                 }
             } else {
                 // Recurse
-                constructNode(begin, end, lcpsBegin, lcpsEnd, minLCP, offset, path + "/" + std::to_string(bucket),
+                constructNode(begin, end, lcpsBegin, minLCP, offset, path + "/" + std::to_string(bucket),
                               layer + 1, ancestorAlphabetMapIndex);
             }
         }
