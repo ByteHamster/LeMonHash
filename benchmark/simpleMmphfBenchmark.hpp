@@ -26,7 +26,7 @@ void simpleMmphfBenchmark(std::vector<key_t> &inputData) {
     }
 
     std::cout<<"\r\033[K"<<"Benchmarking "<<MMphf::name()<<std::flush;
-    size_t numQueries = 1e5;
+    size_t numQueries = 1e6;
     size_t N = inputData.size();
     util::XorShift64 prng(time(nullptr));
     uint64_t h = prng();
