@@ -239,15 +239,29 @@ public:
         return std::accumulate(bitMap, bitMap + words, 0, [](auto a, auto b) { return a + std::popcount(b); });
     }
 
+    uint8_t size2length64(uint8_t size) const {
+        static const uint8_t lookup[256] = {
+            0, 0, 63, 39, 31, 27, 24, 22, 21, 19, 18, 18, 17, 17, 16, 16, 15, 15, 15, 14, 14, 14, 14, 13, 13, 13, 13,
+            13, 13, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 10,
+            10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 9, 9, 9,
+            9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
+            9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
+            8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
+            8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
+            8, 8, 8, 8, 8, 8, 8, 8, 8, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7};
+        return lookup[size];
+        //return uint8_t(63 / std::log2(size));
+    }
+
     /** Returns the length of the longest string from this alphabet that can be fit in a 64-bit integer. */
     uint8_t length64() const {
-        return uint8_t(63 / std::log2(size()));
+        return size2length64(size());
     }
 
     /** Creates a uint64_t from a prefix of the given string. */
     uint64_t readChunk(const char *string, size_t stringLength) const {
         auto sigma = size();
-        auto characters = length64();
+        auto characters = size2length64(sigma);
         uint64_t chunk = 0;
         size_t i = 0;
         for (; i < characters && i < stringLength; i++)
@@ -260,7 +274,7 @@ public:
     /** Creates a uint64_t from the characters at the given indexes of the given string. */
     uint64_t readChunk(const char *string, size_t stringLength, const auto &indexes) const {
         auto sigma = size();
-        auto characters = length64();
+        auto characters = size2length64(sigma);
         uint64_t chunk = 0;
         size_t i = 0;
         for (; i < characters && i < indexes.size() && indexes[i] < stringLength; i++)
