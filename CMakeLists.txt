@@ -5,8 +5,8 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release" AND CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRE
     add_compile_options(-march=native)
 endif()
 
-add_subdirectory(extlib/sicHash EXCLUDE_FROM_ALL)
 add_subdirectory(extlib/util EXCLUDE_FROM_ALL)
+add_subdirectory(extlib/sicHash EXCLUDE_FROM_ALL)
 add_subdirectory(extlib/simpleRibbon EXCLUDE_FROM_ALL)
 
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/extlib/ds2i/succinct/succinct_config.hpp.in
