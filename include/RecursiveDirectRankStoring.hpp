@@ -217,6 +217,16 @@ class RecursiveDirectRankStoringMmphf {
                         for (size_t i = min; i < max; i += (max-min)/100) {
                             std::cout<<"RESULT print="<<bucketsPrinted<<" type=mapper value="<<i<<" rank="<<mapper.bucketOf(i)<<std::endl;
                         }
+                        if (mapper.pgm.one_segment) {
+                            for (float x = 1.00; x > 0.80; x -= 0.03) {
+                                std::cout<<"RESULT print="<<bucketsPrinted<<" type=segmentIntercept value="<<min+x*(max-min)<<" rank=0"<<std::endl;
+                            }
+                        } else {
+                            for (size_t i = 0; i < mapper.pgm.segments_count(); i++) {
+                                auto [key, slope, intercept, next_intercept] = mapper.pgm.segment(i);
+                                std::cout<<"RESULT print="<<bucketsPrinted<<" type=segmentIntercept value="<<max<<" rank="<<intercept<<std::endl;
+                            }
+                        }
                         bucketsPrinted++;
                     }
 

@@ -17,6 +17,7 @@
 namespace pgm {
 
 class UnalignedPGMIndex {
+    public:
     static constexpr auto align_val = std::align_val_t(std::max<size_t>(__STDCPP_DEFAULT_NEW_ALIGNMENT__, 2));
     static constexpr uint8_t first_key_bits = 64;
     static constexpr uint8_t bit_width_bits = 6;
