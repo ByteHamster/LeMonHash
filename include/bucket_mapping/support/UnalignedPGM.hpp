@@ -146,14 +146,21 @@ public:
         std::vector<Segment> segments;
         segments.reserve(n / std::max(2, epsilon * epsilon));
 
+        bool skip_first = n > 2; // the first key will always be mapped to rank 0, so we skip it in the segmentation
+
         internal::OptimalPiecewiseLinearModel<uint64_t, size_t>::CanonicalSegment first_segment;
-        auto in_fun = [&](auto i) { return std::pair<K, size_t>(first[i], i); };
+        auto in_fun = [&](auto i) { return std::pair<K, size_t>(first[i + skip_first], i + skip_first); };
         auto out_fun = [&](auto cs, auto) {
             if (segments.empty())
                 first_segment = cs;
             segments.emplace_back(cs);
         };
-        internal::make_segmentation_mod(n, epsilon, in_fun, out_fun, false);
+        internal::make_segmentation_mod(n - skip_first, epsilon, in_fun, out_fun, false);
+
+        if (segments.size() > 1 && segments.back().key == *(last - 1)) {
+            // if last segment covers only one key we can remove it, as the previous one can map that key correctly
+            segments.pop_back();
+        }
 
         if (segments.size() == 1 && n < (1ull << 31)) {
             auto [flag, slope] = first_segment.get_segment_through_zero();
@@ -246,6 +253,12 @@ public:
         auto next_segment_key = first_key + segment_key_delta(1, segments_offset, segment_bits, key_bits);
         size_t segment_i = 0;
         auto it = first;
+
+        while (it != last && *it < first_key) {
+            f(it, 0);
+            ++it;
+        }
+
         while (it != last) {
             if (segment_i + 1 != n_segments && *it >= next_segment_key) {
                 ++segment_i;
