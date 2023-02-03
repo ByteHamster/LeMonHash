@@ -21,6 +21,12 @@ class UnalignedPGMIndex {
     static constexpr uint8_t first_key_bits = 64;
     static constexpr uint8_t bit_width_bits = 6;
     static constexpr uint8_t slope_bits = 32;
+
+    static constexpr uint8_t one_segment_size_bits = 10;
+    static constexpr uint8_t one_segment_intercept_bits = 21;
+    static constexpr int64_t max_one_segment_intercept = int64_t(1) << (one_segment_intercept_bits - 1);
+    static_assert(slope_bits + one_segment_size_bits + one_segment_intercept_bits == 63);
+
     using K = uint64_t;
 
     bool one_segment : 1;
@@ -45,11 +51,12 @@ class UnalignedPGMIndex {
             operator delete[] (data(), align_val);
     }
 
-    [[nodiscard]] std::pair<float, uint32_t> get_one_segment() const {
+    [[nodiscard]] std::tuple<uint32_t, float, int32_t> get_one_segment() const {
         assert(one_segment);
-        uint32_t n = raw_ptr >> 32;
-        float slope = as_float(uint32_t(raw_ptr & 0xFFFFFFFF));
-        return {slope, n};
+        auto n = uint32_t(raw_ptr >> (one_segment_intercept_bits + slope_bits));
+        auto slope = as_float(uint32_t((raw_ptr >> one_segment_intercept_bits) & 0xFFFFFFFF));
+        auto intercept = int32_t(raw_ptr & ((1ull << one_segment_intercept_bits) - 1)) - max_one_segment_intercept;
+        return {n, slope, intercept};
     }
 
     [[nodiscard]] std::tuple<uint64_t, uint8_t, uint8_t, size_t, size_t, size_t> metadata() const {
@@ -162,12 +169,14 @@ public:
             segments.pop_back();
         }
 
-        if (segments.size() == 1 && n < (1ull << 31)) {
-            auto [flag, slope] = first_segment.get_segment_through_zero();
-            if (flag) {
+        if (segments.size() == 1 && n < 1 << one_segment_size_bits) {
+            auto [slope, intercept] = first_segment.get_floating_point_segment(0);
+            if (intercept > -max_one_segment_intercept && intercept < max_one_segment_intercept) {
                 one_segment = true;
-                raw_ptr = n << 32 | as_uint32(slope);
-                assert(get_one_segment() == std::make_pair((float) slope, (uint32_t) n));
+                raw_ptr = n << (one_segment_intercept_bits + slope_bits);
+                raw_ptr |= uint64_t(as_uint32(slope)) << one_segment_intercept_bits;
+                raw_ptr |= int64_t(intercept) + max_one_segment_intercept;
+                assert(get_one_segment() == std::make_tuple((uint32_t) n, (float) slope, (int32_t) intercept));
                 return;
             }
         }
@@ -198,8 +207,8 @@ public:
     /** Returns the approximate rank of @p key. */
     [[nodiscard]] size_t approximate_rank(const K &key) const {
         if (one_segment) {
-            auto [slope, n] = get_one_segment();
-            auto p = int64_t(std::round(key * slope));
+            auto [n, slope, intercept] = get_one_segment();
+            auto p = int64_t(std::round(key * slope)) + intercept;
             return std::min<size_t>(p > 0 ? size_t(p) : 0ull, n - 1);
         }
 
@@ -238,9 +247,9 @@ public:
     template<typename ForwardIt, typename F>
     void for_each(ForwardIt first, ForwardIt last, F f) const {
         if (one_segment) {
-            auto [slope, n] = get_one_segment();
+            auto [n, slope, intercept] = get_one_segment();
             while (first != last) {
-                auto p = int64_t(std::round(*first * slope));
+                auto p = int64_t(std::round(*first * slope)) + intercept;
                 f(first, std::min<size_t>(p > 0 ? size_t(p) : 0ull, n - 1));
                 ++first;
             }
@@ -274,7 +283,7 @@ public:
 
     /** Returns the number of elements the index was built on. */
     [[nodiscard]] size_t size() const {
-        return one_segment ? get_one_segment().second : std::get<3>(metadata());
+        return one_segment ? std::get<0>(get_one_segment()) : std::get<3>(metadata());
     }
 
     /** Returns the number of segments in the index. */
