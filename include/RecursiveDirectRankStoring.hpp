@@ -212,7 +212,7 @@ class RecursiveDirectRankStoringMmphf {
                             std::cout<<"RESULT print="<<bucketsPrinted<<" type=chunk value="<<chunks.at(i)<<" rank="<<i<<std::endl;
                         }
                         for (size_t i = 0; i < chunks.size(); i++) {
-                            std::cout<<"RESULT print="<<bucketsPrinted<<" type=bucketReceivedKeys value="<<min<<" rank="<<mapper.bucketOf(chunks.at(i))<<std::endl;
+                            std::cout<<"RESULT print="<<bucketsPrinted<<" type=bucketReceivedKeys value="<<0.97*min<<" rank="<<mapper.bucketOf(chunks.at(i))<<std::endl;
                         }
                         for (size_t i = min; i < max; i += (max-min)/100) {
                             std::cout<<"RESULT print="<<bucketsPrinted<<" type=mapper value="<<i<<" rank="<<mapper.bucketOf(i)<<std::endl;
@@ -224,7 +224,7 @@ class RecursiveDirectRankStoringMmphf {
                         } else {
                             for (size_t i = 0; i < mapper.pgm.segments_count(); i++) {
                                 auto [key, slope, intercept, next_intercept] = mapper.pgm.segment(i);
-                                std::cout<<"RESULT print="<<bucketsPrinted<<" type=segmentIntercept value="<<max<<" rank="<<intercept<<std::endl;
+                                std::cout<<"RESULT print="<<bucketsPrinted<<" type=segmentIntercept value="<<1.03*max<<" rank="<<intercept<<std::endl;
                             }
                         }
                         bucketsPrinted++;
