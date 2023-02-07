@@ -1,7 +1,6 @@
 #include <unordered_set>
 #include <tlx/cmdline_parser.hpp>
 #include <DirectRankStoring.hpp>
-#include <ExampleCompetitorMmphfs.hpp>
 #include "simpleMmphfBenchmark.hpp"
 
 /*template <float rankMin, float rankDelta, float rankMax>

@@ -2,7 +2,7 @@
 
 #include <SimpleRibbon.h>
 #include <MurmurHash64.h>
-#include "chunking_strategy/support/util.h"
+#include "support/util.h"
 
 /**
  * Container with multiple retrieval data structures of different sizes.

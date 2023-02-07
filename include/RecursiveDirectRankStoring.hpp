@@ -13,7 +13,7 @@
 #include "support/PartitionedEliasFano.hpp"
 #include <SicHash.h>
 #include "support/TreePath.hpp"
-#include "chunking_strategy/support/AlphabetMapsCollection.h"
+#include "support/AlphabetMapsCollection.h"
 
 using BucketMapperType = UnalignedPgmBucketMapper;
 

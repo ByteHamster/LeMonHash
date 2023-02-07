@@ -3,8 +3,6 @@
 #include <DirectRankStoring.hpp>
 #include "simpleMmphfBenchmark.hpp"
 #include <XorShift64.h>
-#include "ChunkedStringMmphf.hpp"
-#include "simpleMmphfBenchmark.hpp"
 #include "RecursiveDirectRankStoring.hpp"
 
 std::string stringOfLength(size_t length, util::XorShift64 &prng) {
@@ -60,11 +58,9 @@ std::vector<std::string> loadFile(std::string &filename, size_t maxStrings) {
 int main(int argc, char** argv) {
     size_t N = 1e6;
     std::string filename;
-    bool chunking = false;
     tlx::CmdlineParser cmd;
     cmd.add_bytes('n', "num_keys", N, "Number of keys to generate");
     cmd.add_string('f', "filename", filename, "File with input data");
-    cmd.add_bool('c', "chunking", chunking, "Run the (inefficient, preliminary) chunking methods");
     if (!cmd.process(argc, argv)) {
         return 1;
     }
@@ -76,53 +72,6 @@ int main(int argc, char** argv) {
     } else {
         std::cout<<"Loading file "<<filename<<std::endl;
         inputData = loadFile(filename, N);
-    }
-
-    if (chunking) {
-        struct FullChunking {
-            static ChunkingStrategy *createLayer(size_t maxLCP, size_t layer) {
-                return new FullChunkingStrategy(maxLCP, 8);
-            }
-        };
-        simpleMmphfBenchmark<ChunkedStringMmphf<FullChunking>>(inputData);
-
-        //struct GreedyChunking {
-        //    static ChunkingStrategy *createLayer(size_t maxLCP, size_t layer) {
-        //        return new GreedyChunkingStrategy(maxLCP, 8);
-        //    }
-        //};
-        //simpleMmphfBenchmark<ChunkedStringMmphf<GreedyChunking>>(inputData); // Very slow
-
-        struct SeparateChunking {
-            static ChunkingStrategy *createLayer(size_t maxLCP, size_t layer) {
-                return new SeparateChunkingStrategy(maxLCP, 8);
-            }
-        };
-        simpleMmphfBenchmark<ChunkedStringMmphf<SeparateChunking>>(inputData);
-
-        struct LayeredChunking {
-            static ChunkingStrategy *createLayer(size_t maxLCP, size_t layer) {
-                if (layer == 0) {
-                    return new FullChunkingStrategy(maxLCP, 3); // Alphabet reduction
-                } else {
-                    return new FullChunkingStrategy(maxLCP, 8);
-                }
-            }
-        };
-        simpleMmphfBenchmark<ChunkedStringMmphf<LayeredChunking>>(inputData);
-
-        struct LayeredChunkingForUrls {
-            static ChunkingStrategy *createLayer(size_t maxLCP, size_t layer) {
-                if (layer == 0) {
-                    return new FullChunkingStrategy(maxLCP, 3); // Alphabet reduction
-                } else if (layer == 1) {
-                    return new BackChunkingStrategy(maxLCP, 8); // Make long strings shorter
-                } else {
-                    return new FullChunkingStrategy(maxLCP, 8);
-                }
-            }
-        };
-        simpleMmphfBenchmark<ChunkedStringMmphf<LayeredChunkingForUrls>>(inputData);
     }
 
     simpleMmphfBenchmark<RecursiveDirectRankStoringMmphf>(inputData);
