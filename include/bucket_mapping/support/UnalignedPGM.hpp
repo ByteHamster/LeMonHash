@@ -16,6 +16,11 @@
 
 namespace pgm {
 
+/**
+ * Variant of the PGM that stores its data in an uncompressed bit vector.
+ * Also compresses "rank space" just before a segment start that no key is mapped to.
+ * So this does not actually return rank estimates.
+ */
 class UnalignedPGMIndex {
     static constexpr auto align_val = std::align_val_t(std::max<size_t>(__STDCPP_DEFAULT_NEW_ALIGNMENT__, 2));
     static constexpr uint8_t first_key_bits = 64;
@@ -155,12 +160,17 @@ public:
 
         bool skip_first = n > 2; // the first key will always be mapped to rank 0, so we skip it in the segmentation
 
-        internal::OptimalPiecewiseLinearModel<uint64_t, size_t>::CanonicalSegment first_segment;
+        using segment_t = internal::OptimalPiecewiseLinearModel<uint64_t, size_t>::CanonicalSegment;
+        segment_t first_segment;
+        int32_t after_last_point_of_previous_segment = 0;
         auto in_fun = [&](auto i) { return std::pair<K, size_t>(first[i + skip_first], i + skip_first); };
-        auto out_fun = [&](auto cs, auto) {
+        auto out_fun = [&](segment_t cs, auto lastPointOfSegment) {
             if (segments.empty())
                 first_segment = cs;
             segments.emplace_back(cs);
+            Segment &new_segment = segments.back();
+            new_segment.intercept = std::min(after_last_point_of_previous_segment, new_segment.intercept);
+            after_last_point_of_previous_segment = int64_t(std::round(new_segment.slope * (lastPointOfSegment.first - new_segment.key))) + new_segment.intercept + 1;
         };
         internal::make_segmentation_mod(n - skip_first, epsilon, in_fun, out_fun, false);
 
@@ -192,7 +202,7 @@ public:
         sdsl::bits::write_int_and_move(ptr, segments.front().key, offset, first_key_bits);
         sdsl::bits::write_int_and_move(ptr, key_bits - 1, offset, bit_width_bits);
         sdsl::bits::write_int_and_move(ptr, size_bits - 1, offset, bit_width_bits);
-        sdsl::bits::write_int_and_move(ptr, n - 1, offset, size_bits);
+        sdsl::bits::write_int_and_move(ptr, std::min(n, (size_t) after_last_point_of_previous_segment) - 1, offset, size_bits);
         sdsl::bits::write_int_and_move(ptr, segments.size() - 1, offset, size_bits);
 
         for (size_t i = 0; i < segments.size(); ++i) {
@@ -281,7 +291,7 @@ public:
         }
     }
 
-    /** Returns the number of elements the index was built on. */
+    /** Returns the number of output buckets. (Compressed version of number of input objects) */
     [[nodiscard]] size_t size() const {
         return one_segment ? std::get<0>(get_one_segment()) : std::get<3>(metadata());
     }
