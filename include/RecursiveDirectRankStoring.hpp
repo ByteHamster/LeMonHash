@@ -325,7 +325,7 @@ class RecursiveDirectRankStoringMmphf {
             std::cout<<"Bucket mapper:       "<<8.0*std::accumulate(treeNodes.begin(), treeNodes.end(), 0,
                                                                     [] (size_t size, auto &node) { return size + node.size(); }) / N<<std::endl;
             std::cout<<"Bucket offsets:      "<<1.0 * std::accumulate(bucketOffsets.begin(), bucketOffsets.end(), 0,
-                                                                      [] (size_t size, PartitionedEliasFano &fano) { return size + fano.bit_size(); }) / N<<std::endl;
+                                                                      [] (size_t size, auto &fano) { return size + fano.bit_size(); }) / N<<std::endl;
             std::cout<<"Tree node data:      "<<(8.0 * (treeNodes.size() * sizeof(TreeNode) + sizeof(Mphf))
                                                     + treeNodesMphf->spaceUsage())/N<<std::endl;
             std::cout<<"Alphabet maps:       "<<8.0 * alphabetMaps.sizeInBytes() / N<<std::endl;
@@ -340,7 +340,7 @@ class RecursiveDirectRankStoringMmphf {
                             + sizeof(Mphf)
                             + bucketOffsets.size() * sizeof(void*))
                         + std::accumulate(bucketOffsets.begin(), bucketOffsets.end(), 0,
-                                          [] (size_t size, PartitionedEliasFano &fano) { return size + fano.bit_size(); })
+                                          [] (size_t size, auto &fano) { return size + fano.bit_size(); })
                         + 8 * std::accumulate(treeNodes.begin(), treeNodes.end(), 0,
                                               [] (size_t size, auto &node) { return size + node.size(); })
                         + 8 * alphabetMaps.sizeInBytes()
@@ -739,7 +739,7 @@ class RecursiveDirectRankStoringV2Mmphf {
             std::cout<<"Bucket mapper:       "<<8.0*std::accumulate(treeNodes.begin(), treeNodes.end(), 0,
                                                                     [] (size_t size, auto &node) { return size + node.size(); }) / N<<std::endl;
             std::cout<<"Bucket offsets:      "<<1.0 * std::accumulate(bucketOffsets.begin(), bucketOffsets.end(), 0,
-                                                                      [] (size_t size, PartitionedEliasFano &fano) { return size + fano.bit_size(); }) / N<<std::endl;
+                                                                      [] (size_t size, auto &fano) { return size + fano.bit_size(); }) / N<<std::endl;
             std::cout<<"Tree node data:      "<<(8.0 * (treeNodes.size() * sizeof(TreeNode) + sizeof(Mphf))
                                                 + treeNodesMphf->spaceUsage())/N<<std::endl;
             std::cout<<"Alphabet maps:       "<<8.0 * alphabetMaps.sizeInBytes() / N<<std::endl;
@@ -754,7 +754,7 @@ class RecursiveDirectRankStoringV2Mmphf {
                                 + sizeof(Mphf)
                                 + bucketOffsets.size() * sizeof(void*))
                         + std::accumulate(bucketOffsets.begin(), bucketOffsets.end(), 0,
-                                          [] (size_t size, PartitionedEliasFano &fano) { return size + fano.bit_size(); })
+                                          [] (size_t size, auto &fano) { return size + fano.bit_size(); })
                         + 8 * std::accumulate(treeNodes.begin(), treeNodes.end(), 0,
                                               [] (size_t size, auto &node) { return size + node.size(); })
                         + 8 * alphabetMaps.sizeInBytes()
