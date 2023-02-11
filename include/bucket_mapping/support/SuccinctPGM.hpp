@@ -121,6 +121,7 @@ public:
         yshifts_data.push_back(epsilon);
         yshifts.resize(yshifts_data.size());
         std::copy(yshifts_data.begin(), yshifts_data.end(), yshifts.begin());
+        assert(size() == n);
     }
 
     /** Execute a given function for each key in the sorted range [first, last). The function takes as the argument
@@ -170,6 +171,14 @@ public:
     }
 
     [[nodiscard]] size_t epsilon_value() const { return epsilon; }
+
+    /**
+     * Returns the number of elements the index was built on.
+     * @return the number of elements the index was built on
+     */
+    [[nodiscard]] size_t size() const {
+        return std::get<2>(get_ys(segments_count() - 2)) + 1;
+    }
 
 private:
 
