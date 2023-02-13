@@ -80,7 +80,7 @@ struct AlphabetMap {
         }
 
         /** Returns the rank of a given character in the alphabet. */
-        uint8_t rank(uint8_t c) const {
+        size_t rank(uint8_t c) const {
             if constexpr (ASCII)
                 c = c < 128 ? c : 127;
             auto rank = 0;
@@ -146,12 +146,12 @@ struct AlphabetMap {
 
         /** Creates a uint64_t from a prefix of the given string. */
         uint64_t readChunk(const char *string, size_t stringLength) const {
-            auto sigma = size();
-            auto characters = size2length64(sigma);
+            size_t sigma = size();
+            size_t characters = size2length64(sigma);
             uint64_t chunk = 0;
             size_t i = 0;
             for (; i < characters && i < stringLength; i++)
-                chunk = chunk * sigma + std::min<uint8_t>(rank(string[i]), sigma - 1);
+                chunk = chunk * sigma + std::min<size_t>(rank(string[i]), sigma - 1);
             for (; i < characters; i++)
                 chunk *= sigma;
             return chunk;
@@ -159,12 +159,12 @@ struct AlphabetMap {
 
         /** Creates a uint64_t from the characters at the given indexes of the given string. */
         uint64_t readChunk(const char *string, size_t stringLength, const auto &indexes) const {
-            auto sigma = size();
-            auto characters = size2length64(sigma);
+            size_t sigma = size();
+            size_t characters = size2length64(sigma);
             uint64_t chunk = 0;
             size_t i = 0;
             for (; i < characters && i < indexes.size() && indexes[i] < stringLength; i++)
-                chunk = chunk * sigma + std::min<uint8_t>(rank(string[indexes[i]]), sigma - 1);
+                chunk = chunk * sigma + std::min<size_t>(rank(string[indexes[i]]), sigma - 1);
             for (; i < characters; i++)
                 chunk *= sigma;
             return chunk;

@@ -9,8 +9,11 @@
 size_t LCP(const auto &s1, const auto &s2) {
     size_t lcp = 0;
     size_t minLength = std::min(s1.length(), s2.length());
-    auto s1ptr = s1.data();
-    auto s2ptr = s2.data();
+    const char* s1ptr = s1.data();
+    const char* s2ptr = s2.data();
+    while (lcp < minLength - 8 && *(uint64_t*)(&s1ptr[lcp]) == *(uint64_t*)(&s2ptr[lcp])) {
+        lcp += 8;
+    }
     while (lcp < minLength && s1ptr[lcp] == s2ptr[lcp]) {
         lcp++;
     }
