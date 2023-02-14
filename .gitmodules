@@ -10,3 +10,6 @@
 [submodule "extlib/sicHash"]
 	path = extlib/sicHash
 	url = git@github.com:ByteHamster/SicHash.git
+[submodule "extlib/pthash"]
+	path = extlib/pthash
+	url = https://github.com/jermp/pthash.git

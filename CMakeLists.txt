@@ -6,8 +6,11 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release" AND CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRE
 endif()
 
 add_subdirectory(extlib/util EXCLUDE_FROM_ALL)
-add_subdirectory(extlib/sicHash EXCLUDE_FROM_ALL)
 add_subdirectory(extlib/simpleRibbon EXCLUDE_FROM_ALL)
+
+add_library(PTHash INTERFACE)
+target_compile_features(PTHash INTERFACE cxx_std_20)
+target_include_directories(PTHash INTERFACE extlib/pthash/include)
 
 option(SUCCINCT_USE_INTRINSICS "Use a set of intrinsics available on all x86-64 architectures" ON)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/extlib/ds2i/succinct/succinct_config.hpp.in
@@ -20,7 +23,7 @@ target_include_directories(ds2i SYSTEM INTERFACE extlib/ds2i)
 add_library(DirectRankStoring INTERFACE)
 target_compile_features(DirectRankStoring INTERFACE cxx_std_20)
 target_include_directories(DirectRankStoring INTERFACE include)
-target_link_libraries(DirectRankStoring INTERFACE SimpleRibbon ByteHamsterUtil ds2i SicHash)
+target_link_libraries(DirectRankStoring INTERFACE SimpleRibbon ByteHamsterUtil ds2i PTHash)
 
 # Do not create benchmark targets when this is a subdirectory
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
