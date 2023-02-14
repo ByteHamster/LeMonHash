@@ -6,41 +6,40 @@
 #include <vector>
 
 /**
- * Stores a monotonic list of integers using Elias-Fano coding.
- * Uses a partitioned Elias-Fano implementation that optimizes irregularities.
- * Additionally, filters out runs of repeated same values using rank/select.
+ * Stores a monotonic list of integers.
+ * Filters out runs of repeated same values using rank/select.
+ * Relays actual storage of the integers to the child data structure.
  */
-class PartitionedEliasFano {
+template <typename ChildSequence>
+class DuplicateFilterList {
     private:
-        std::vector<size_t> inputData;
-        succinct::bit_vector bv;
-        ds2i::partitioned_sequence<ds2i::compact_elias_fano>::enumerator enumerator;
-        size_t n = 0;
         static constexpr size_t DUPLICATE_FILTER_GRANULARITY = 3;
+        size_t n = 0;
+        uint64_t lastValueOfPreviousArea = 0;
         std::vector<size_t> insertionBuffer;
         pasta::BitVector duplicateFilterIsAreaStored;
         pasta::FlatRankSelect<pasta::OptimizedFor::ONE_QUERIES> duplicateFilterRank;
+        ChildSequence child;
     public:
-        PartitionedEliasFano() {
+        DuplicateFilterList() {
             duplicateFilterIsAreaStored.resize(100, false);
             duplicateFilterIsAreaStored[0] = true;
         }
 
-        PartitionedEliasFano(PartitionedEliasFano &&other) noexcept {
-            inputData = std::move(other.inputData);
-            other.bv.swap(bv);
-            enumerator = other.enumerator;
+        DuplicateFilterList(DuplicateFilterList &&other) noexcept {
+            std::construct_at(&child, std::move(other.child));
             n = other.n;
+            lastValueOfPreviousArea = other.lastValueOfPreviousArea;
             insertionBuffer = std::move(other.insertionBuffer);
             duplicateFilterIsAreaStored = std::move(other.duplicateFilterIsAreaStored);
             duplicateFilterRank = std::move(other.duplicateFilterRank);
         }
 
         void append(size_t x) {
-            assert(bv.size() == 0); // Not already completed
             n++;
             if (n <= DUPLICATE_FILTER_GRANULARITY) {
-                inputData.push_back(x);
+                child.append(x);
+                lastValueOfPreviousArea = x;
             } else {
                 insertionBuffer.push_back(x);
                 flushInsertionBuffer(false);
@@ -56,12 +55,13 @@ class PartitionedEliasFano {
             }
             bool allSame = true;
             for (size_t i : insertionBuffer) {
-                allSame = allSame && i == inputData.back();
+                allSame = allSame && i == lastValueOfPreviousArea;
             }
             size_t area = (n - 1) / DUPLICATE_FILTER_GRANULARITY;
             if (!allSame || forceFlush) {
                 for (size_t i : insertionBuffer) {
-                    inputData.push_back(i);
+                    child.append(i);
+                    lastValueOfPreviousArea = i;
                 }
                 if (duplicateFilterIsAreaStored.size() < area + 1) {
                     duplicateFilterIsAreaStored.resize(area * 2, false);
@@ -80,21 +80,9 @@ class PartitionedEliasFano {
                 return;
             }
             flushInsertionBuffer(true);
-            size_t universe = inputData.back() + 1;
-
-            succinct::bit_vector_builder bvb;
-            ds2i::global_parameters params;
-            ds2i::partitioned_sequence<ds2i::compact_elias_fano>::write(
-                    bvb, inputData.begin(), universe, inputData.size(), params);
-            succinct::bit_vector(&bvb).swap(bv);
-            enumerator = ds2i::partitioned_sequence<ds2i::compact_elias_fano>::enumerator(
-                    bv, 0, universe, inputData.size(), params);
-
             duplicateFilterIsAreaStored.resize(n / DUPLICATE_FILTER_GRANULARITY + 1, false);
             duplicateFilterRank = pasta::FlatRankSelect<pasta::OptimizedFor::ONE_QUERIES>(duplicateFilterIsAreaStored);
-
-            inputData.clear();
-            inputData.shrink_to_fit();
+            child.complete();
         }
 
         size_t at(size_t i) {
@@ -110,12 +98,72 @@ class PartitionedEliasFano {
                 index--;
             }
             assert(index <= i);
-            assert(index < enumerator.size());
-            return enumerator.move(index).second;
+            return child.at(index);
         }
 
         size_t bit_size() {
-            return bv.size() + 8 * sizeof(*this) + duplicateFilterIsAreaStored.size() + 8 * duplicateFilterRank.space_usage();
+            return 8 * (sizeof(*this) - sizeof(ChildSequence))
+                    + duplicateFilterIsAreaStored.size()
+                    + 8 * duplicateFilterRank.space_usage()
+                    + child.bit_size();
+        }
+};
+
+/**
+ * Stores a monotonic list of integers using Elias-Fano coding.
+ * Uses a partitioned Elias-Fano implementation that optimizes irregularities.
+ */
+class PartitionedEliasFano {
+    private:
+        std::vector<size_t> inputData;
+        succinct::bit_vector bv;
+        ds2i::partitioned_sequence<ds2i::compact_elias_fano>::enumerator enumerator;
+        size_t n = 0;
+    public:
+        PartitionedEliasFano() = default;
+
+        PartitionedEliasFano(PartitionedEliasFano &&other) noexcept {
+            inputData = std::move(other.inputData);
+            other.bv.swap(bv);
+            enumerator = other.enumerator;
+            n = other.n;
+        }
+
+        void append(size_t x) {
+            assert(bv.size() == 0); // Not already completed
+            n++;
+            inputData.push_back(x);
+        }
+
+        size_t size() const {
+            return n;
+        }
+
+        void complete() {
+            if (n == 0) {
+                return;
+            }
+            size_t universe = inputData.back() + 1;
+
+            succinct::bit_vector_builder bvb;
+            ds2i::global_parameters params;
+            ds2i::partitioned_sequence<ds2i::compact_elias_fano>::write(
+                    bvb, inputData.begin(), universe, inputData.size(), params);
+            succinct::bit_vector(&bvb).swap(bv);
+            enumerator = ds2i::partitioned_sequence<ds2i::compact_elias_fano>::enumerator(
+                    bv, 0, universe, inputData.size(), params);
+
+            inputData.clear();
+            inputData.shrink_to_fit();
+        }
+
+        size_t at(size_t i) {
+            assert(i < n);
+            return enumerator.move(i).second;
+        }
+
+        size_t bit_size() {
+            return bv.size() + 8 * sizeof(*this);
         }
 };
 

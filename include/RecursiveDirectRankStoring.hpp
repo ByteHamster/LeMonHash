@@ -124,7 +124,7 @@ class RecursiveDirectRankStoringMmphf {
         std::vector<TreeNode> treeNodes;
         using Mphf = pthash::single_phf<pthash::murmurhash2_64, pthash::compact_compact, true>;
         Mphf treeNodesMphf;
-        std::vector<PartitionedEliasFano> bucketOffsets;
+        std::vector<DuplicateFilterList<PartitionedEliasFano>> bucketOffsets;
         AlphabetMapsCollection alphabetMaps;
     public:
         explicit RecursiveDirectRankStoringMmphf(const std::vector<std::string> &strings) {
@@ -557,7 +557,7 @@ class RecursiveDirectRankStoringV2Mmphf {
         std::vector<TreeNode> treeNodes;
         using Mphf = pthash::single_phf<pthash::murmurhash2_64, pthash::compact_compact, true>;
         Mphf treeNodesMphf;
-        std::vector<PartitionedEliasFano> bucketOffsets;
+        std::vector<DuplicateFilterList<PartitionedEliasFano>> bucketOffsets;
         AlphabetMapsCollection alphabetMaps;
 
     public:
