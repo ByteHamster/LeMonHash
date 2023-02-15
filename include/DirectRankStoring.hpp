@@ -30,7 +30,7 @@ class DirectRankStoringMmphf {
             return "DirectRankStoringMmphf bucketMapper=" + BucketMapper::name();
         }
 
-        explicit DirectRankStoringMmphf(std::vector<uint64_t> &data)
+        explicit DirectRankStoringMmphf(const std::vector<uint64_t> &data)
                 : N(data.size()),
                   bucketMapper(data.begin(), data.end()),
                   bucketSizePrefix(bucketMapper.numBuckets() + 1, data.size() + 1) {
@@ -74,7 +74,7 @@ class DirectRankStoringMmphf {
             retrievalDataStructure.build();
         }
 
-        size_t operator()(uint64_t key) {
+        size_t operator()(const uint64_t key) {
             auto ptr = bucketSizePrefix.at(bucketMapper.bucketOf(key));
             size_t bucketOffset = *ptr;
             ++ptr;
