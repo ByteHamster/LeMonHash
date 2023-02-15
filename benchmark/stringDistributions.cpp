@@ -74,8 +74,10 @@ int main(int argc, char** argv) {
         inputData = loadFile(filename, N);
     }
 
-    simpleMmphfBenchmark<RecursiveDirectRankStoringMmphf>(inputData);
-    simpleMmphfBenchmark<RecursiveDirectRankStoringV2Mmphf>(inputData);
+    size_t positionOfSlash = filename.find_last_of('/');
+    std::string baseFilename = positionOfSlash == std::string::npos ? filename : filename.substr(positionOfSlash + 1);
+    simpleMmphfBenchmark<RecursiveDirectRankStoringMmphf>(inputData, baseFilename);
+    simpleMmphfBenchmark<RecursiveDirectRankStoringV2Mmphf>(inputData, baseFilename);
 
     return 0;
 }
