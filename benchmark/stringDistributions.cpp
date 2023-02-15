@@ -40,6 +40,7 @@ std::vector<std::string> loadFile(std::string &filename, size_t maxStrings) {
     std::vector<std::string> inputData;
     inputData.reserve(maxStrings);
     std::ifstream stream(filename);
+    if (!stream) throw std::system_error(errno, std::system_category(), "failed to open " + filename);
     const int MAX_LENGTH = 524288;
     char* line = new char[MAX_LENGTH];
     while (stream.getline(line, MAX_LENGTH)) {
@@ -56,7 +57,7 @@ std::vector<std::string> loadFile(std::string &filename, size_t maxStrings) {
 }
 
 int main(int argc, char** argv) {
-    size_t N = 1e6;
+    size_t N = std::numeric_limits<size_t>::max();
     std::string filename;
     tlx::CmdlineParser cmd;
     cmd.add_bytes('n', "num_keys", N, "Number of keys to generate");
