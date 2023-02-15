@@ -129,6 +129,7 @@ class RecursiveDirectRankStoringMmphf {
     public:
         explicit RecursiveDirectRankStoringMmphf(const std::vector<std::string> &strings) {
             N = strings.size();
+            if (N == 0) return;
             {
                 auto lcps = computeLCPs(strings.begin(), strings.end());
                 constructNode(strings.begin(), strings.end(), lcps.begin(), 0, TreePath(), 0, 0);

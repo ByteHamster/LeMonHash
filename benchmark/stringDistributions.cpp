@@ -73,6 +73,10 @@ int main(int argc, char** argv) {
         std::cout<<"Loading file "<<filename<<std::endl;
         inputData = loadFile(filename, N);
     }
+    if (inputData.empty()) {
+        std::cout<<"Empty input data. Used invalid file?"<<std::endl;
+        return 1;
+    }
 
     size_t positionOfSlash = filename.find_last_of('/');
     std::string baseFilename = positionOfSlash == std::string::npos ? filename : filename.substr(positionOfSlash + 1);
