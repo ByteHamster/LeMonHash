@@ -110,6 +110,167 @@ private:
     }
 };
 
+/** Store points using Elias-Fano representations without support for efficient random access. */
+class EFSequentialPointsStorage {
+    uint64_t *data;
+    // data layout:
+    // epsilon in epsilon_bit_width bits
+    // nsegments in nsegments_bit_width bits
+    // encoding size of xs in bit_offset_width bits
+    // encoding size of ys in bit_offset_width bits
+    // (nsegments*2+1) yshifts, each in yshift_bit_width(epsilon) bits
+    // xs in Elias-Fano representation
+    // ys in Elias-Fano representation
+
+    using EFIterator = util::SequentialEliasFano::Iterator;
+
+    static constexpr uint8_t epsilon_bit_width = 8;
+    static constexpr uint8_t nsegments_bit_width = 24;
+    static constexpr uint8_t bit_offset_width = 32;
+
+public:
+
+    EFSequentialPointsStorage() = default;
+
+    void load(const auto &xs_data, const auto &ys_data, const auto &yshifts_data, uint8_t epsilon) {
+        auto xs_bit_size = util::SequentialEliasFano::encodingSize(xs_data);
+        auto ys_bit_size = util::SequentialEliasFano::encodingSize(ys_data);
+
+        auto yshift_width = yshift_bit_width(epsilon);
+        auto total_bit_size = epsilon_bit_width + nsegments_bit_width + bit_offset_width + bit_offset_width
+            + xs_bit_size + ys_bit_size + yshifts_data.size() * yshift_width;
+        data = new uint64_t[(total_bit_size + 63) / 64]();
+
+        auto ptr = data;
+        uint8_t word_offset = 0;
+        auto nsegments = xs_data.size() - 1;
+        sdsl::bits::write_int_and_move(ptr, epsilon, word_offset, epsilon_bit_width);
+        sdsl::bits::write_int_and_move(ptr, nsegments, word_offset, nsegments_bit_width);
+        sdsl::bits::write_int_and_move(ptr, xs_bit_size, word_offset, bit_offset_width);
+        sdsl::bits::write_int_and_move(ptr, ys_bit_size, word_offset, bit_offset_width);
+        assert(epsilon_value() == epsilon);
+        assert(segments_count() == nsegments);
+        assert(yshifts_offset() == size_t(ptr - data) * 64 + word_offset);
+
+        for (size_t i = 0; i < yshifts_data.size(); ++i) {
+            sdsl::bits::write_int_and_move(ptr, yshifts_data[i], word_offset, yshift_width);
+            assert(get_yshift(i) == yshifts_data[i]);
+        }
+
+        assert(size_t(ptr - data) * 64 + word_offset == xs_offset());
+        assert(size_t(ptr - data) * 64 + word_offset + xs_bit_size == ys_offset());
+        util::SequentialEliasFano::write(data, (ptr - data) * 64 + word_offset, xs_data);
+        util::SequentialEliasFano::write(data, (ptr - data) * 64 + word_offset + xs_bit_size, ys_data);
+        assert(size_in_bytes() / sizeof(uint64_t) == (total_bit_size + 63) / 64);
+    }
+
+    [[nodiscard]] std::tuple<size_t, uint64_t, uint64_t, int64_t, int64_t, int64_t> segment_for_key(auto key) const {
+        EFIterator it(data, xs_offset(), xs_size());
+        do {
+            ++it;
+        } while (it.index() + 1 < xs_size() && *it <= key);
+
+        auto x1 = *it;
+        --it;
+        auto x0 = *it;
+        auto [y0, y1, y2] = get_ys(it.index());
+        return {it.index(), x0, x1, y0, y1, y2};
+    }
+
+    [[nodiscard]] std::tuple<uint64_t, uint64_t, int64_t, int64_t, int64_t> segment_at(size_t i) const {
+        EFIterator it(data, xs_offset(), xs_size());
+        auto x0 = it.at(i);
+        ++it;
+        auto x1 = *it;
+        auto [y0, y1, y2] = get_ys(i);
+        return {x0, x1, y0, y1, y2};
+    }
+
+    [[nodiscard]] size_t size() const { return EFIterator(data, ys_offset(), ys_size()).at(ys_size() - 1); }
+
+    [[nodiscard]] size_t size_in_bytes() const {
+        auto bit_offset = epsilon_bit_width + nsegments_bit_width + bit_offset_width;
+        auto bit_size = ys_offset() + sdsl::bits::read_int(data + bit_offset / 64, bit_offset % 64, bit_offset_width);
+        return ((bit_size + 63) / 64) * sizeof(uint64_t);
+    }
+
+    [[nodiscard]] uint8_t epsilon_value() const { return sdsl::bits::read_int(data, 0, epsilon_bit_width); }
+
+    [[nodiscard]] size_t segments_count() const {
+        return sdsl::bits::read_int(data, epsilon_bit_width, nsegments_bit_width);
+    }
+
+    ~EFSequentialPointsStorage() { delete[] data; }
+
+    class Iterator {
+        EFIterator xs_it;
+        EFIterator ys_it;
+        const EFSequentialPointsStorage *storage;
+
+    public:
+
+        Iterator(EFIterator xs_it, EFIterator ys_it, const EFSequentialPointsStorage *storage)
+            : xs_it(xs_it), ys_it(ys_it), storage(storage) {}
+
+        std::tuple<uint64_t, uint64_t, int64_t, int64_t, int64_t> operator*() {
+            auto tmp1 = xs_it;
+            auto x0 = *tmp1;
+            auto x1 = *++tmp1;
+            auto tmp2 = ys_it;
+            auto y0 = *tmp2;
+            auto y1 = *++tmp2;
+            auto point_index = xs_it.index();
+            int64_t epsilon = storage->epsilon_value();
+            auto shift1 = int64_t(storage->get_yshift(point_index * 2)) - epsilon;
+            auto shift2 = int64_t(storage->get_yshift(point_index * 2 + 1)) - epsilon;
+            auto shift3 = int64_t(storage->get_yshift(point_index * 2 + 2)) - epsilon;
+            return {x0, x1, y0 - shift1, y1 - shift2, y1 - shift3};
+        }
+
+        void operator++() {
+            ++xs_it;
+            ++ys_it;
+        }
+    };
+
+    Iterator begin() const {
+        return {EFIterator(data, xs_offset(), xs_size()), EFIterator(data, ys_offset(), ys_size()), this};
+    }
+
+private:
+
+    size_t xs_size() const { return segments_count() + 1; }
+
+    size_t ys_size() const { return segments_count() + 2; }
+
+    size_t yshifts_size() const { return segments_count() * 2 + 1; }
+
+    size_t yshifts_offset() const { return epsilon_bit_width + nsegments_bit_width + 2 * bit_offset_width; }
+
+    size_t xs_offset() const { return yshifts_offset() + yshifts_size() * yshift_bit_width(epsilon_value()); }
+
+    size_t ys_offset() const {
+        return xs_offset() + sdsl::bits::read_int(data, epsilon_bit_width + nsegments_bit_width, bit_offset_width);
+    }
+
+    uint64_t get_yshift(size_t index) const {
+        auto bit_offset = yshifts_offset() + index * yshift_bit_width(epsilon_value());
+        return sdsl::bits::read_int(data + bit_offset / 64, bit_offset % 64, yshift_bit_width(epsilon_value()));
+    }
+
+    [[nodiscard]] std::tuple<int64_t, int64_t, int64_t> get_ys(size_t point_index) const {
+        EFIterator it(data, ys_offset(), ys_size());
+        int64_t y0 = it.at(point_index);
+        ++it;
+        int64_t y1 = *it;
+        int64_t epsilon = epsilon_value();
+        auto shift1 = int64_t(get_yshift(point_index * 2)) - epsilon;
+        auto shift2 = int64_t(get_yshift(point_index * 2 + 1)) - epsilon;
+        auto shift3 = int64_t(get_yshift(point_index * 2 + 2)) - epsilon;
+        return {y0 - shift1, y1 - shift2, y1 - shift3};
+    }
+};
+
 template<typename PointsStorage = EFPointsStorage>
 class SuccinctPGMIndex {
     using K = uint64_t;

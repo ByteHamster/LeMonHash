@@ -93,8 +93,8 @@ int main(int argc, char** argv) {
     //doTest<DirectRetrievalMmphf>(inputData);
     //simpleMmphfBenchmark<DirectRankStoringMmphf<LinearBucketMapper<1.0f>>>(inputData);
     //simpleMmphfBenchmark<DirectRankStoringMmphf<LinearBucketMapper<1.125f>>>(inputData);
-    //simpleMmphfBenchmark<DirectRankStoringMmphf<PgmBucketMapper>>(inputData);
-    simpleMmphfBenchmark<DirectRankStoringMmphf<SuccinctPgmBucketMapper>>(inputData, datasetName);
+    //simpleMmphfBenchmark<DirectRankStoringMmphf<PGMBucketMapper>>(inputData);
+    simpleMmphfBenchmark<DirectRankStoringMmphf<SuccinctPGMBucketMapper>>(inputData, datasetName);
 
     std::vector<std::string> inputAsString;
     inputAsString.reserve(inputData.size());
