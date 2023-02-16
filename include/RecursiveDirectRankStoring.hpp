@@ -142,24 +142,29 @@ class RecursiveDirectRankStoringMmphf {
             }
             alphabetMaps.shrinkToFit();
 
-            std::vector<uint64_t> mphfInput;
-            mphfInput.reserve(treeNodesInput.size());
-            for (auto &pair : treeNodesInput) {
-                mphfInput.emplace_back(pair.first);
-            }
+            if (treeNodesInput.size() == 1) {
+                treeNodes.resize(1);
+                std::construct_at(&treeNodes[0], std::move(treeNodesInput.front().second));
+            } else {
+                std::vector<uint64_t> mphfInput;
+                mphfInput.reserve(treeNodesInput.size());
+                for (auto &pair : treeNodesInput) {
+                    mphfInput.emplace_back(pair.first);
+                }
 
-            pthash::build_configuration config;
-            config.c = 7.0;
-            config.alpha = 0.99;
-            config.num_threads = 1;
-            config.minimal_output = true;
-            config.verbose_output = false;
-            treeNodesMphf.build_in_internal_memory(mphfInput.begin(), mphfInput.size(), config);
+                pthash::build_configuration config;
+                config.c = 7.0;
+                config.alpha = 0.99;
+                config.num_threads = 1;
+                config.minimal_output = true;
+                config.verbose_output = false;
+                treeNodesMphf.build_in_internal_memory(mphfInput.begin(), mphfInput.size(), config);
 
-            treeNodes.resize(treeNodesInput.size());
-            for (auto &pair : treeNodesInput) {
-                size_t index = treeNodesMphf(pair.first);
-                std::construct_at(&treeNodes.at(index), std::move(pair.second));
+                treeNodes.resize(treeNodesInput.size());
+                for (auto &pair: treeNodesInput) {
+                    size_t index = treeNodesMphf(pair.first);
+                    std::construct_at(&treeNodes.at(index), std::move(pair.second));
+                }
             }
             treeNodesInput.clear();
             treeNodesInput.shrink_to_fit();
@@ -390,7 +395,7 @@ class RecursiveDirectRankStoringMmphf {
 
         uint64_t operator ()(const std::string &string) {
             TreePath path;
-            TreeNode *node = &treeNodes.at(treeNodesMphf(path.currentNodeHash()));
+            TreeNode *node = &treeNodes.at(treeNodes.size() == 1 ? 0 : treeNodesMphf(path.currentNodeHash()));
             size_t layer = 0;
             while (true) {
                 uint64_t chunk = extractChunk(string, *node);
@@ -581,18 +586,23 @@ class RecursiveDirectRankStoringV2Mmphf {
                 mphfInput.emplace_back(pair.first);
             }
 
-            pthash::build_configuration config;
-            config.c = 7.0;
-            config.alpha = 0.99;
-            config.num_threads = 1;
-            config.minimal_output = true;
-            config.verbose_output = false;
-            treeNodesMphf.build_in_internal_memory(mphfInput.begin(), mphfInput.size(), config);
+            if (treeNodesInput.size() == 1) {
+                treeNodes.resize(1);
+                std::construct_at(&treeNodes[0], std::move(treeNodesInput.front().second));
+            } else {
+                pthash::build_configuration config;
+                config.c = 7.0;
+                config.alpha = 0.99;
+                config.num_threads = 1;
+                config.minimal_output = true;
+                config.verbose_output = false;
+                treeNodesMphf.build_in_internal_memory(mphfInput.begin(), mphfInput.size(), config);
 
-            treeNodes.resize(treeNodesInput.size());
-            for (auto &pair : treeNodesInput) {
-                size_t index = treeNodesMphf(pair.first);
-                std::construct_at(&treeNodes.at(index), std::move(pair.second));
+                treeNodes.resize(treeNodesInput.size());
+                for (auto &pair : treeNodesInput) {
+                    size_t index = treeNodesMphf(pair.first);
+                    std::construct_at(&treeNodes.at(index), std::move(pair.second));
+                }
             }
             treeNodesInput.clear();
             treeNodesInput.shrink_to_fit();
@@ -806,7 +816,7 @@ class RecursiveDirectRankStoringV2Mmphf {
 
         uint64_t operator ()(const std::string &string) {
             TreePath path;
-            TreeNode *node = &treeNodes.at(treeNodesMphf(path.currentNodeHash()));
+            TreeNode *node = &treeNodes.at(treeNodes.size() == 1 ? 0 : treeNodesMphf(path.currentNodeHash()));
             size_t layer = 0;
             while (true) {
                 auto indexes = node->getIndexes(alphabetMaps.length64(node->alphabetMapIndex));
