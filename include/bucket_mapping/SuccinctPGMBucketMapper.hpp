@@ -8,7 +8,7 @@
  */
 struct SuccinctPGMBucketMapper {
     union {
-        pgm::SuccinctPGMIndex *pgmIndex = nullptr;
+        pgm::SuccinctPGMIndex<> *pgmIndex = nullptr;
         uint64_t uOverN;
     };
     size_t numBuckets_ : 63;

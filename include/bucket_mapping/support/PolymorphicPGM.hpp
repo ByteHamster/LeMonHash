@@ -38,6 +38,7 @@ class PolymorphicPGMIndex {
     bool one_segment : 1;
     bool compressed : 1;
     uint64_t raw_ptr : 62;
+    using succinct_pgm_type = SuccinctPGMIndex<>;
 
     // if !one_segment and !compressed, then uncompressed_data() points to a memory area containing:
     //   first_key in first_key_bits
@@ -53,9 +54,9 @@ class PolymorphicPGMIndex {
         return reinterpret_cast<uint64_t *>(raw_ptr << 2);
     }
 
-    [[nodiscard]] SuccinctPGMIndex *compressed_data() const {
+    [[nodiscard]] succinct_pgm_type *compressed_data() const {
         assert(!one_segment && compressed);
-        return reinterpret_cast<SuccinctPGMIndex *>(raw_ptr << 2);
+        return reinterpret_cast<succinct_pgm_type *>(raw_ptr << 2);
     }
 
     [[nodiscard]] uint64_t *one_segment_data() const {
@@ -66,7 +67,7 @@ class PolymorphicPGMIndex {
     void free_data() {
         if (!one_segment) {
             if (compressed)
-                compressed_data()->~SuccinctPGMIndex();
+                compressed_data()->~succinct_pgm_type();
             else
                 operator delete[] (uncompressed_data(), align_val);
         }
@@ -215,8 +216,8 @@ public:
         auto key_bits = std::bit_width(std::max<uint64_t>(1, segments.back().key - segments.front().key - (segments.size() - 1)));
         auto size_bits = std::bit_width(n - 1);
         auto words = words_needed(key_bits, size_bits, segments.size());
-        if (words > 4 * sizeof(SuccinctPGMIndex)) {
-            auto *succinct = new SuccinctPGMIndex(first, last, epsilon);
+        if (words > 4 * sizeof(succinct_pgm_type)) {
+            auto *succinct = new succinct_pgm_type(first, last, epsilon);
             if (succinct->size_in_bytes() < words * sizeof(uint64_t)) {
                 one_segment = false;
                 compressed = true;
