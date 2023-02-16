@@ -10,10 +10,9 @@
  * Filters out runs of repeated same values using rank/select.
  * Relays actual storage of the integers to the child data structure.
  */
-template <typename ChildSequence>
+template <typename ChildSequence, size_t FILTER_GRANULARITY = 3>
 class DuplicateFilterRank {
     private:
-        static constexpr size_t DUPLICATE_FILTER_GRANULARITY = 3;
         size_t n = 0;
         uint64_t lastValueOfPreviousArea = 0;
         std::vector<size_t> insertionBuffer;
@@ -37,7 +36,7 @@ class DuplicateFilterRank {
 
         void append(size_t x) {
             n++;
-            if (n <= DUPLICATE_FILTER_GRANULARITY) {
+            if (n <= FILTER_GRANULARITY) {
                 child.append(x);
                 lastValueOfPreviousArea = x;
             } else {
@@ -47,7 +46,7 @@ class DuplicateFilterRank {
         }
 
         void flushInsertionBuffer(bool forceFlush) {
-            if (insertionBuffer.size() < DUPLICATE_FILTER_GRANULARITY && !forceFlush) {
+            if (insertionBuffer.size() < FILTER_GRANULARITY && !forceFlush) {
                 return;
             }
             if (insertionBuffer.empty()) {
@@ -57,7 +56,7 @@ class DuplicateFilterRank {
             for (size_t i : insertionBuffer) {
                 allSame = allSame && i == lastValueOfPreviousArea;
             }
-            size_t area = (n - 1) / DUPLICATE_FILTER_GRANULARITY;
+            size_t area = (n - 1) / FILTER_GRANULARITY;
             if (!allSame || forceFlush) {
                 for (size_t i : insertionBuffer) {
                     child.append(i);
@@ -80,19 +79,19 @@ class DuplicateFilterRank {
                 return;
             }
             flushInsertionBuffer(true);
-            duplicateFilterIsAreaStored.resize(n / DUPLICATE_FILTER_GRANULARITY + 1, false);
+            duplicateFilterIsAreaStored.resize(n / FILTER_GRANULARITY + 1, false);
             duplicateFilterRank = pasta::FlatRankSelect<pasta::OptimizedFor::ONE_QUERIES>(duplicateFilterIsAreaStored);
             child.complete();
         }
 
         size_t at(size_t i) {
             assert(i < n);
-            size_t area = i / DUPLICATE_FILTER_GRANULARITY;
-            size_t areaLocation = DUPLICATE_FILTER_GRANULARITY * duplicateFilterRank.rank1(area);
+            size_t area = i / FILTER_GRANULARITY;
+            size_t areaLocation = FILTER_GRANULARITY * duplicateFilterRank.rank1(area);
             size_t index = areaLocation;
             bool isAreaStored = duplicateFilterIsAreaStored[area];
             if (isAreaStored) {
-                index += i % DUPLICATE_FILTER_GRANULARITY;
+                index += i % FILTER_GRANULARITY;
             } else {
                 // Take last key of previous area
                 index--;
