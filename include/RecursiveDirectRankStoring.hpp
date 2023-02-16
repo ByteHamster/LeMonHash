@@ -5,8 +5,9 @@
 #include <unordered_set>
 #include <algorithm>
 #include <fstream>
-#include "bucket_mapping/SuccinctPgmBucketMapper.hpp"
-#include "bucket_mapping/UnalignedPgmBucketMapper.hpp"
+#include "bucket_mapping/SuccinctPGMBucketMapper.hpp"
+#include "bucket_mapping/UnalignedPGMBucketMapper.hpp"
+#include "bucket_mapping/PolymorphicPGMBucketMapper.hpp"
 #include "DirectRankStoring.hpp"
 #include "bucket_mapping/support/EliasFanoModified.hpp"
 #include <MurmurHash64.h>
@@ -15,7 +16,7 @@
 #include "support/TreePath.hpp"
 #include "support/AlphabetMapsCollection.h"
 
-using BucketMapperType = UnalignedPgmBucketMapper;
+using BucketMapperType = UnalignedPGMBucketMapper;
 
 template <typename T>
 T& maybe_deref(T &x) { return x; }

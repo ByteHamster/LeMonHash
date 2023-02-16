@@ -2,12 +2,11 @@
 
 #include "BucketMapper.hpp"
 #include "support/SuccinctPGM.hpp"
-#include "support/util.hpp"
 
 /**
  * Uses a succinct version of the PGM Index to get an approximate rank, which we use as bucket index.
  */
-struct SuccinctPgmBucketMapper {
+struct SuccinctPGMBucketMapper {
     union {
         pgm::SuccinctPGMIndex *pgmIndex = nullptr;
         uint64_t uOverN;
@@ -15,10 +14,10 @@ struct SuccinctPgmBucketMapper {
     size_t numBuckets_ : 63;
     bool usesPgmIndex : 1;
 
-    SuccinctPgmBucketMapper() = default;
+    SuccinctPGMBucketMapper() = default;
 
     template<typename RandomIt>
-    SuccinctPgmBucketMapper(RandomIt begin, RandomIt end) {
+    SuccinctPGMBucketMapper(RandomIt begin, RandomIt end) {
         auto n = (uint64_t) std::distance(begin, end);
         auto bestCost = std::numeric_limits<size_t>::max();
 
@@ -27,8 +26,8 @@ struct SuccinctPgmBucketMapper {
         RandomIt bucketBegin;
         auto updateCost = [&](auto it, size_t bucket) {
             if (bucket != previousBucket) {
-                auto bucketSize = std::distance(bucketBegin, it);
-                cost += bucketSize <= 1 ? 0 : bucketSize * BIT_WIDTH(bucketSize - 1);
+                auto bucketSize = (size_t) std::distance(bucketBegin, it);
+                cost += bucketSize <= 1 ? 0 : bucketSize * std::bit_width(bucketSize - 1);
                 previousBucket = bucket;
                 bucketBegin = it;
             }
@@ -115,7 +114,7 @@ struct SuccinctPgmBucketMapper {
         return "u/n=" + std::to_string(uOverN);
     }
 
-    ~SuccinctPgmBucketMapper() {
+    ~SuccinctPGMBucketMapper() {
         if (usesPgmIndex)
             delete pgmIndex;
     }

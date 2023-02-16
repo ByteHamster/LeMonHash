@@ -1,9 +1,9 @@
 #pragma once
 
 #include "OptimalPiecewiseLinearModel.hpp"
-#include "util.hpp"
 #include <sdsl/bits.hpp>
 #include <algorithm>
+#include <bit>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -15,41 +15,6 @@
 #include <vector>
 
 namespace pgm {
-
-struct Segment {
-    using K = uint64_t;
-    using Floating = float;
-    K key;             ///< The first key that the segment indexes.
-    Floating slope;    ///< The slope of the segment.
-    int32_t intercept; ///< The intercept of the segment.
-
-    Segment() = default;
-
-    Segment(K key, Floating slope, int32_t intercept) : key(key), slope(slope), intercept(intercept) {};
-
-    explicit Segment(size_t n) : key(std::numeric_limits<K>::max()), slope(), intercept(n) {};
-
-    explicit Segment(const typename internal::OptimalPiecewiseLinearModel<K, size_t>::CanonicalSegment &cs)
-        : key(cs.first.x) {
-        auto[cs_slope, cs_intercept] = cs.get_floating_point_segment(key);
-        if (cs_intercept > std::numeric_limits<decltype(intercept)>::max())
-            throw std::overflow_error("Change the type of Segment::intercept to int64");
-        slope = cs_slope;
-        intercept = cs_intercept;
-    }
-
-    friend inline bool operator<(const K &k, const Segment &s) { return k < s.key; }
-
-    /**
-     * Returns the approximate position of the specified key.
-     * @param k the key whose position must be approximated
-     * @return the approximate position of the specified key
-     */
-    inline size_t operator()(const K &k) const {
-        auto pos = int64_t(slope * (k - key)) + intercept;
-        return pos > 0 ? size_t(pos) : 0ull;
-    }
-};
 
 /**
  * Variant of the PGM that stores its data in an uncompressed bit vector.
@@ -226,8 +191,8 @@ public:
             }
         }
 
-        auto key_bits = BIT_WIDTH(std::max<uint64_t>(1, segments.back().key - segments.front().key - (segments.size() - 1)));
-        auto size_bits = BIT_WIDTH(n - 1);
+        auto key_bits = std::bit_width(std::max<uint64_t>(1, segments.back().key - segments.front().key - (segments.size() - 1)));
+        auto size_bits = std::bit_width(n - 1);
         auto ptr = new(align_val) uint64_t[words_needed(key_bits, size_bits, segments.size())];
         one_segment = false;
         raw_ptr = reinterpret_cast<uint64_t>(ptr) >> 1;

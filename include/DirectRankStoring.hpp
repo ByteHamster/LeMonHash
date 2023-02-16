@@ -7,8 +7,8 @@
 #include <Function.h>
 #include "MultiRetrievalDataStructure.hpp"
 #include "bucket_mapping/LinearBucketMapper.hpp"
-#include "bucket_mapping/PgmBucketMapper.hpp"
-#include "bucket_mapping/SuccinctPgmBucketMapper.hpp"
+#include "bucket_mapping/PGMBucketMapper.hpp"
+#include "bucket_mapping/SuccinctPGMBucketMapper.hpp"
 
 /**
  * Monotone Minimal Perfect Hash Function (MMPHF) using the Direct Rank Storing (DRS) technique.

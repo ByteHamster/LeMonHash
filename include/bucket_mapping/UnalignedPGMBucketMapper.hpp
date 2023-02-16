@@ -1,18 +1,17 @@
 #pragma once
 
-#include "support/PolymorphicPGM.hpp"
-#include "support/util.hpp"
+#include "support/UnalignedPGM.hpp"
 
 /**
  * Uses a PGM-index to get an approximate rank, which we use as bucket index.
  */
-struct PolymorphicPgmBucketMapper {
-    pgm::PolymorphicPGMIndex pgm;
+struct UnalignedPGMBucketMapper {
+    pgm::UnalignedPGMIndex pgm;
 
-    PolymorphicPgmBucketMapper() = default;
+    UnalignedPGMBucketMapper() = default;
 
     template<typename RandomIt>
-    PolymorphicPgmBucketMapper(RandomIt begin, RandomIt end) : pgm() {
+    UnalignedPGMBucketMapper(RandomIt begin, RandomIt end) : pgm() {
         auto bestCost = std::numeric_limits<size_t>::max();
 
         size_t cost;
@@ -20,15 +19,15 @@ struct PolymorphicPgmBucketMapper {
         RandomIt bucketBegin;
         auto updateCost = [&](auto it, size_t bucket) {
             if (bucket != previousBucket) {
-                auto bucketSize = std::distance(bucketBegin, it);
-                cost += bucketSize <= 1 ? 0 : bucketSize * BIT_WIDTH(bucketSize - 1);
+                auto bucketSize = (size_t) std::distance(bucketBegin, it);
+                cost += bucketSize <= 1 ? 0 : bucketSize * std::bit_width(bucketSize - 1);
                 previousBucket = bucket;
                 bucketBegin = it;
             }
         };
 
         for (auto epsilon : {3, 7, 15, 31, 63}) {
-            pgm::PolymorphicPGMIndex p(begin, end, epsilon);
+            pgm::UnalignedPGMIndex p(begin, end, epsilon);
 
             cost = p.size_in_bytes() * 8;
             previousBucket = 0;
@@ -68,7 +67,7 @@ struct PolymorphicPgmBucketMapper {
     }
 
     static std::string name() {
-        return std::string("PolymorphicPgmBucketMapper");
+        return std::string("UnalignedPgmBucketMapper");
     }
 
 };
