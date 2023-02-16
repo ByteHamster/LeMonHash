@@ -121,47 +121,12 @@ struct AlphabetMap {
         }
 
         /** Returns the number of characters in the alphabet. */
-        uint8_t size() const {
+        size_t size() const {
             return std::accumulate(bitMap, bitMap + words, 0, [](auto a, auto b) { return a + std::popcount(b); });
         }
 
-        uint8_t size2length64(uint8_t size) const {
-            static const uint8_t lookup[256] = {
-                    8, 8, 64, 40, 32, 27, 24, 22, 21, 20, 19, 18, 17, 17, 16, 16, 16, 15, 15, 15, 14,
-                    14, 14, 14, 13, 13, 13, 13, 13, 13, 13, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 11,
-                    11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 10, 10, 10, 10, 10, 10,
-                    10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10,
-                    10, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
-                    9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
-                    8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
-                    8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
-                    8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
-                    8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,};
-            return lookup[size];
-            /*
-            Close to (but not exactly) 63 / std::log2(size).
-            Lookup table generation code:
-                std::string line;
-                for (size_t alphabetSize = 0; alphabetSize <= 256; alphabetSize++) {
-                    size_t charsReadable = 8;
-                    if (alphabetSize >= 2) {
-                        while (std::ceil(std::log2(alphabetSize) * double(charsReadable + 1)) <= 64) {
-                            charsReadable++;
-                        }
-                    }
-                    line += std::to_string(charsReadable) + ",";
-                    if (line.length() > 80) {
-                        std::cout<<line<<std::endl;
-                        line = "";
-                    } else {
-                        line += " ";
-                    }
-                }
-                std::cout<<std::endl;*/
-        }
-
         /** Returns the length of the longest string from this alphabet that can be fit in a 64-bit integer. */
-        uint8_t length64() const {
+        size_t length64() const {
             return size2length64(size());
         }
 
@@ -189,5 +154,36 @@ struct AlphabetMap {
             for (; i < characters; i++)
                 chunk *= sigma;
             return chunk;
+        }
+
+    private:
+
+        size_t size2length64(size_t size) const {
+            static const uint8_t lookup[257] = {
+                64, 64, 64, 40, 32, 27, 24, 22, 21, 20, 19, 18, 17, 17, 16, 16, 16, 15, 15, 15, 14,
+                14, 14, 14, 13, 13, 13, 13, 13, 13, 13, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 11,
+                11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 10, 10, 10, 10, 10, 10,
+                10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10,
+                10, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
+                9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
+                8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
+                8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
+                8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
+                8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
+                8, 8, 8, 8, 8, 8};
+            return lookup[size]; // return size_t(64 / std::log2(std::max<size_t>(2, size)));
+            /* Lookup table generation code:
+                std::string line;
+                for (size_t alphabetSize = 0; alphabetSize <= 256; alphabetSize++) {
+                    size_t formula = 64 / std::log2(std::max<size_t>(2, alphabetSize));
+                    line += std::to_string(formula) + ",";
+                    if (line.length() > 80) {
+                        std::cout<<line<<std::endl;
+                        line = "";
+                    } else {
+                        line += " ";
+                    }
+                }
+                std::cout<<line<<std::endl;*/
         }
 };
