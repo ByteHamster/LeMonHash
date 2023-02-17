@@ -48,7 +48,7 @@ struct SuccinctPGMBucketMapper {
 
         // Evaluate PGM
         for (auto epsilon : {3, 7, 15, 31, 63}) {
-            auto *pgm = new pgm::SuccinctPGMIndex(begin, end, epsilon);
+            auto *pgm = new pgm::SuccinctPGMIndex<>(begin, end, epsilon);
 
             cost = pgm->size_in_bytes() * 8;
             // If the cost of the PGM alone already is larger, we do not need to run for_each

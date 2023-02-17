@@ -18,10 +18,12 @@ struct EFPointsStorage {
     ys_type *ys;
     sdsl::int_vector<> yshifts;
     uint8_t epsilon;
+    uint64_t first;
 
     EFPointsStorage() = default;
 
-    void load(const auto &xs_data, const auto &ys_data, const auto &yshifts_data, uint8_t epsilon) {
+    void load(uint64_t first, const auto &xs_data, const auto &ys_data, const auto &yshifts_data, uint8_t epsilon) {
+        this->first = first;
         this->epsilon = epsilon;
         xs = new xs_type(xs_data.size(), xs_data.back() + 1);
         ys = new ys_type(ys_data.size(), ys_data.back() + 1);
@@ -59,6 +61,8 @@ struct EFPointsStorage {
         auto [y0, y1, y2] = get_ys(i);
         return {*p, *np, y0, y1, y2};
     }
+
+    [[nodiscard]] uint64_t first_key() const { return first; }
 
     ~EFPointsStorage() {
         delete xs;
@@ -114,6 +118,7 @@ private:
 class EFSequentialPointsStorage {
     uint64_t *data;
     // data layout:
+    // first_key in key_bit_width bits
     // epsilon in epsilon_bit_width bits
     // nsegments in nsegments_bit_width bits
     // encoding size of xs in bit_offset_width bits
@@ -124,6 +129,7 @@ class EFSequentialPointsStorage {
 
     using EFIterator = util::SequentialEliasFano::Iterator;
 
+    static constexpr uint8_t key_bit_width = 64;
     static constexpr uint8_t epsilon_bit_width = 8;
     static constexpr uint8_t nsegments_bit_width = 24;
     static constexpr uint8_t bit_offset_width = 32;
@@ -132,22 +138,24 @@ public:
 
     EFSequentialPointsStorage() = default;
 
-    void load(const auto &xs_data, const auto &ys_data, const auto &yshifts_data, uint8_t epsilon) {
+    void load(uint64_t first, const auto &xs_data, const auto &ys_data, const auto &yshifts_data, uint8_t epsilon) {
         auto xs_bit_size = util::SequentialEliasFano::encodingSize(xs_data);
         auto ys_bit_size = util::SequentialEliasFano::encodingSize(ys_data);
 
         auto yshift_width = yshift_bit_width(epsilon);
-        auto total_bit_size = epsilon_bit_width + nsegments_bit_width + bit_offset_width + bit_offset_width
-            + xs_bit_size + ys_bit_size + yshifts_data.size() * yshift_width;
+        auto total_bit_size = key_bit_width + epsilon_bit_width + nsegments_bit_width + bit_offset_width +
+            bit_offset_width + xs_bit_size + ys_bit_size + yshifts_data.size() * yshift_width;
         data = new uint64_t[(total_bit_size + 63) / 64]();
 
         auto ptr = data;
         uint8_t word_offset = 0;
         auto nsegments = xs_data.size() - 1;
+        sdsl::bits::write_int_and_move(ptr, first, word_offset, key_bit_width);
         sdsl::bits::write_int_and_move(ptr, epsilon, word_offset, epsilon_bit_width);
         sdsl::bits::write_int_and_move(ptr, nsegments, word_offset, nsegments_bit_width);
         sdsl::bits::write_int_and_move(ptr, xs_bit_size, word_offset, bit_offset_width);
         sdsl::bits::write_int_and_move(ptr, ys_bit_size, word_offset, bit_offset_width);
+        assert(first_key() == first);
         assert(epsilon_value() == epsilon);
         assert(segments_count() == nsegments);
         assert(yshifts_offset() == size_t(ptr - data) * 64 + word_offset);
@@ -189,15 +197,19 @@ public:
     [[nodiscard]] size_t size() const { return EFIterator(data, ys_offset(), ys_size()).at(ys_size() - 1); }
 
     [[nodiscard]] size_t size_in_bytes() const {
-        auto bit_offset = epsilon_bit_width + nsegments_bit_width + bit_offset_width;
+        auto bit_offset = key_bit_width + epsilon_bit_width + nsegments_bit_width + bit_offset_width;
         auto bit_size = ys_offset() + sdsl::bits::read_int(data + bit_offset / 64, bit_offset % 64, bit_offset_width);
         return ((bit_size + 63) / 64) * sizeof(uint64_t);
     }
 
-    [[nodiscard]] uint8_t epsilon_value() const { return sdsl::bits::read_int(data, 0, epsilon_bit_width); }
+    [[nodiscard]] uint8_t epsilon_value() const { return sdsl::bits::read_int(data, key_bit_width, epsilon_bit_width); }
 
     [[nodiscard]] size_t segments_count() const {
-        return sdsl::bits::read_int(data, epsilon_bit_width, nsegments_bit_width);
+        return sdsl::bits::read_int(data, key_bit_width + epsilon_bit_width, nsegments_bit_width);
+    }
+
+    [[nodiscard]] uint64_t first_key() const {
+        return sdsl::bits::read_int(data, 0, key_bit_width);
     }
 
     ~EFSequentialPointsStorage() { delete[] data; }
@@ -245,7 +257,9 @@ private:
 
     size_t yshifts_size() const { return segments_count() * 2 + 1; }
 
-    size_t yshifts_offset() const { return epsilon_bit_width + nsegments_bit_width + 2 * bit_offset_width; }
+    size_t yshifts_offset() const {
+        return key_bit_width + epsilon_bit_width + nsegments_bit_width + 2 * bit_offset_width;
+    }
 
     size_t xs_offset() const { return yshifts_offset() + yshifts_size() * yshift_bit_width(epsilon_value()); }
 
@@ -274,7 +288,6 @@ private:
 template<typename PointsStorage = EFPointsStorage>
 class SuccinctPGMIndex {
     using K = uint64_t;
-    K first_key;
     PointsStorage points;
 
 public:
@@ -299,8 +312,13 @@ public:
         std::vector<uint32_t> yshifts_data;
         auto yshift_width = yshift_bit_width(epsilon);
 
+        auto expected_segments = n / std::max(2, epsilon * epsilon);
+        xs_data.reserve(expected_segments + 1);
+        ys_data.reserve(expected_segments + 2);
+        yshifts_data.reserve(expected_segments * 2 + 1);
+
         bool skip_first = n > 2; // the first key will always be mapped to rank 0, so we skip it in the segmentation
-        first_key = first[skip_first];
+        auto first_key = first[skip_first];
 
         auto in_fun = [&](auto i) { return std::pair<K, size_t>(first[i + skip_first], i + skip_first); };
         auto out_fun = [&](auto cs, auto last_point) {
@@ -326,7 +344,7 @@ public:
 
         ys_data.push_back(n);
         yshifts_data.push_back(epsilon);
-        points.load(xs_data, ys_data, yshifts_data, epsilon);
+        points.load(first_key, xs_data, ys_data, yshifts_data, epsilon);
         assert(size() == n);
     }
 
@@ -339,6 +357,7 @@ public:
         auto [x0, x1, y0, y1, y2] = *segment_it;
 
         auto it = first;
+        auto first_key = points.first_key();
         while (it != last && *it < first_key) {
             f(it, 0);
             ++it;
@@ -360,6 +379,7 @@ public:
     }
 
     [[nodiscard]] size_t approximate_rank(K key) const {
+        auto first_key = points.first_key();
         if (key < first_key)
             return 0;
         auto [point_index, x0, x1, y0, y1, y2] = points.segment_for_key(key - first_key);
