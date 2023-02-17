@@ -33,28 +33,7 @@ struct SuccinctPGMBucketMapper {
             }
         };
 
-        for (auto epsilon : {3, 7, 15, 31, 63}) {
-            auto *pgm = new pgm::SuccinctPGMIndex(begin, end, epsilon);
-
-            cost = pgm->size_in_bytes() * 8;
-            previousBucket = 0;
-            bucketBegin = begin;
-            pgm->for_each(begin, end, updateCost);
-            updateCost(end, std::numeric_limits<uint64_t>::max());
-
-            auto segmentsCount = pgm->segments_count();
-            if (cost < bestCost) {
-                delete pgmIndex;
-                pgmIndex = pgm;
-                bestCost = cost;
-            } else {
-                delete pgm;
-            }
-            if (segmentsCount == 1)
-                break;
-        }
-
-        // Evaluate if linear mapper is better
+        // Evaluate simple linear mapper
         auto tmpUOverN = *(end - 1) / (n - 1);
         cost = 0;
         previousBucket = 0;
@@ -62,15 +41,38 @@ struct SuccinctPGMBucketMapper {
         for (auto it = begin; it != end; ++it)
             updateCost(it, linearMapper(*it, n, tmpUOverN));
         updateCost(end, std::numeric_limits<uint64_t>::max());
+        usesPgmIndex = false;
+        uOverN = tmpUOverN;
+        numBuckets_ = n;
+        bestCost = cost;
 
-        if (cost < bestCost) {
-            delete pgmIndex;
-            usesPgmIndex = false;
-            uOverN = tmpUOverN;
-            numBuckets_ = n;
-        } else {
-            usesPgmIndex = true;
-            numBuckets_ = bucketOf(*std::prev(end)) + 1;
+        // Evaluate PGM
+        for (auto epsilon : {3, 7, 15, 31, 63}) {
+            auto *pgm = new pgm::SuccinctPGMIndex(begin, end, epsilon);
+
+            cost = pgm->size_in_bytes() * 8;
+            // If the cost of the PGM alone already is larger, we do not need to run for_each
+            if (cost < bestCost) {
+                previousBucket = 0;
+                bucketBegin = begin;
+                pgm->for_each(begin, end, updateCost);
+                updateCost(end, std::numeric_limits<uint64_t>::max());
+            }
+
+            auto segmentsCount = pgm->segments_count();
+            if (cost < bestCost) {
+                if (usesPgmIndex) {
+                    delete pgmIndex;
+                }
+                pgmIndex = pgm;
+                usesPgmIndex = true;
+                numBuckets_ = bucketOf(*std::prev(end)) + 1;
+                bestCost = cost;
+            } else {
+                delete pgm;
+            }
+            if (segmentsCount == 1)
+                break;
         }
     }
 
