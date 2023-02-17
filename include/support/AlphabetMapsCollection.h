@@ -23,8 +23,8 @@ class AlphabetMapsCollection {
             }
 
             size_t length64 = map.length64();
-            for (size_t i = 0; i < maps7.size(); i++) {
-                if (maps8[i].contains(map) && maps7[i].length64() == length64) {
+            for (size_t i = 0; i < maps8.size(); i++) {
+                if (maps8[i].contains(map) && maps8[i].length64() == length64) {
                     return (i << 1) | 1;
                 }
             }
