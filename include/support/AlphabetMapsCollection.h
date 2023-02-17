@@ -9,12 +9,25 @@ class AlphabetMapsCollection {
 
         AlphabetMapsCollection() = default;
 
-        uint64_t pushBack(const AlphabetMap<false> &map) {
+        uint64_t addOrFindSimilar(const AlphabetMap<false> &map) {
             if (map.isAscii()) {
-                maps7.emplace_back(map.toAscii());
+                AlphabetMap<true> asciiMap = map.toAscii();
+                size_t length64 = asciiMap.length64();
+                for (size_t i = 0; i < maps7.size(); i++) {
+                    if (maps7[i].contains(asciiMap) && maps7[i].length64() == length64) {
+                        return i << 1;
+                    }
+                }
+                maps7.push_back(asciiMap);
                 return (maps7.size() - 1) << 1;
             }
 
+            size_t length64 = map.length64();
+            for (size_t i = 0; i < maps7.size(); i++) {
+                if (maps8[i].contains(map) && maps7[i].length64() == length64) {
+                    return (i << 1) | 1;
+                }
+            }
             maps8.emplace_back(map);
             return ((maps8.size() - 1) << 1) | 1;
         }

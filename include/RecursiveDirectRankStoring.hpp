@@ -192,7 +192,7 @@ class RecursiveDirectRankStoringMmphf {
                 if (!alphabetMaps.empty() && am.length64() == alphabetMaps.length64(ancestorAlphabetMapIndex)) {
                     treeNode.alphabetMapIndex = ancestorAlphabetMapIndex;
                 } else {
-                    treeNode.alphabetMapIndex = alphabetMaps.pushBack(am);
+                    treeNode.alphabetMapIndex = alphabetMaps.addOrFindSimilar(am);
                 }
             } else {
                 treeNode.alphabetMapIndex = ancestorAlphabetMapIndex;
@@ -629,7 +629,7 @@ class RecursiveDirectRankStoringV2Mmphf {
                 if (!alphabetMaps.empty() && am.length64() == alphabetMaps.length64(ancestorAlphabetMapIndex)) {
                     treeNode.alphabetMapIndex = ancestorAlphabetMapIndex;
                 } else {
-                    treeNode.alphabetMapIndex = alphabetMaps.pushBack(am);
+                    treeNode.alphabetMapIndex = alphabetMaps.addOrFindSimilar(am);
                 }
             } else {
                 treeNode.alphabetMapIndex = ancestorAlphabetMapIndex;
