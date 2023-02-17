@@ -289,8 +289,7 @@ public:
      * @param first, last the range containing the sorted keys to be indexed
      */
     template<typename RandomIt>
-    SuccinctPGMIndex(RandomIt first, RandomIt last, uint8_t epsilon)
-        : first_key(std::distance(first, last) ? *first : 0ull)  {
+    SuccinctPGMIndex(RandomIt first, RandomIt last, uint8_t epsilon) {
         auto n = (size_t) std::distance(first, last);
         if (n == 0)
             return;
@@ -300,7 +299,10 @@ public:
         std::vector<uint32_t> yshifts_data;
         auto yshift_width = yshift_bit_width(epsilon);
 
-        auto in_fun = [&](auto i) { return std::pair<K, size_t>(first[i], i); };
+        bool skip_first = n > 2; // the first key will always be mapped to rank 0, so we skip it in the segmentation
+        first_key = first[skip_first];
+
+        auto in_fun = [&](auto i) { return std::pair<K, size_t>(first[i + skip_first], i + skip_first); };
         auto out_fun = [&](auto cs, auto last_point) {
             auto x0 = cs.rectangle[1].x;
             auto y0 = cs.rectangle[1].y;
@@ -311,8 +313,8 @@ public:
             auto yshift1 = cs.first.y - eval1 + epsilon;
             auto yshift2 = last_point.second - eval2 + epsilon;
             if (yshift1 < 0 || yshift2 < 0
-                || sdsl::bits::hi(yshift1) + 1 > yshift_width
-                || sdsl::bits::hi(yshift2) + 1 > yshift_width)
+                || std::bit_width(yshift1) > yshift_width
+                || std::bit_width(yshift2) > yshift_width)
                 throw std::runtime_error("Unexpected shift > epsilon");
 
             xs_data.emplace_back(last_point.first - first_key);
@@ -320,9 +322,7 @@ public:
             yshifts_data.push_back(yshift1);
             yshifts_data.push_back(yshift2);
         };
-
-        auto ignore_last = *std::prev(last) == std::numeric_limits<K>::max();
-        internal::make_segmentation_mod(n - ignore_last, epsilon, in_fun, out_fun, true);
+        internal::make_segmentation_mod(n - skip_first, epsilon, in_fun, out_fun, true);
 
         ys_data.push_back(n);
         yshifts_data.push_back(epsilon);
@@ -339,6 +339,11 @@ public:
         auto [x0, x1, y0, y1, y2] = *segment_it;
 
         auto it = first;
+        while (it != last && *it < first_key) {
+            f(it, 0);
+            ++it;
+        }
+
         while (it != last) {
             assert(*it >= first_key);
             if (*it >= first_key + x1 && segment_i != segments_count() - 1) {
@@ -355,9 +360,10 @@ public:
     }
 
     [[nodiscard]] size_t approximate_rank(K key) const {
-        auto k = std::max(first_key, key);
-        auto [point_index, x0, x1, y0, y1, y2] = points.segment_for_key(k - first_key);
-        auto eval = evaluate(k - first_key, x0, x1, y0, y1);
+        if (key < first_key)
+            return 0;
+        auto [point_index, x0, x1, y0, y1, y2] = points.segment_for_key(key - first_key);
+        auto eval = evaluate(key - first_key, x0, x1, y0, y1);
         auto pos = std::min<size_t>(eval > 0 ? size_t(eval) : 0ull, y2 - 1);
         return pos;
     }
@@ -384,7 +390,7 @@ public:
 
 private:
 
-    [[nodiscard]] size_t evaluate(K k, K x0, K x1, int64_t y0, int64_t y1) const {
+    [[nodiscard]] int64_t evaluate(K k, K x0, K x1, int64_t y0, int64_t y1) const {
         return y0 + ((__int128(k) - x0) * (y1 - y0)) / (x1 - x0);
     }
 };
