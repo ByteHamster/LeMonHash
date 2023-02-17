@@ -35,12 +35,14 @@ class PolymorphicPGMIndex {
 
     using K = uint64_t;
 
-    bool one_segment : 1;
-    bool compressed : 1;
-    uint64_t raw_ptr : 62;
-    using succinct_pgm_type = SuccinctPGMIndex<>;
+    enum Type { ONE_SEGMENT, UNCOMPRESSED, COMPRESSED_SEQUENTIAL, COMPRESSED };
 
-    // if !one_segment and !compressed, then uncompressed_data() points to a memory area containing:
+    Type type : 2;
+    uint64_t raw_ptr : 62;
+    using compressed_type = SuccinctPGMIndex<EFPointsStorage>;
+    using compressed_sequential_type = SuccinctPGMIndex<EFSequentialPointsStorage>;
+
+    // if type == UNCOMPRESSED, then uncompressed_data() points to a memory area containing:
     //   first_key in first_key_bits
     //   key_bits-1 in bit_width_bits
     //   size_bits-1 in bit_width_bits
@@ -50,31 +52,36 @@ class PolymorphicPGMIndex {
     //   remaining segments, where ith segment: (key-first_key-i, slope, intercept) in (key_bits, slope_bits, size_bits)
 
     [[nodiscard]] uint64_t *uncompressed_data() const {
-        assert(!one_segment && !compressed);
+        assert(type == UNCOMPRESSED);
         return reinterpret_cast<uint64_t *>(raw_ptr << 2);
     }
 
-    [[nodiscard]] succinct_pgm_type *compressed_data() const {
-        assert(!one_segment && compressed);
-        return reinterpret_cast<succinct_pgm_type *>(raw_ptr << 2);
+    [[nodiscard]] compressed_type *compressed_data() const {
+        assert(type == COMPRESSED);
+        return reinterpret_cast<compressed_type *>(raw_ptr << 2);
+    }
+
+    [[nodiscard]] compressed_sequential_type *compressed_sequential_data() const {
+        assert(type == COMPRESSED_SEQUENTIAL);
+        return reinterpret_cast<compressed_sequential_type *>(raw_ptr << 2);
     }
 
     [[nodiscard]] uint64_t *one_segment_data() const {
-        assert(one_segment);
+        assert(type == ONE_SEGMENT);
         return reinterpret_cast<uint64_t *>(raw_ptr << 2);
     }
 
     void free_data() {
-        if (!one_segment) {
-            if (compressed)
-                compressed_data()->~succinct_pgm_type();
-            else
-                operator delete[] (uncompressed_data(), align_val);
+        switch (type) {
+            case ONE_SEGMENT: break;
+            case UNCOMPRESSED: operator delete[] (uncompressed_data(), align_val); break;
+            case COMPRESSED: compressed_data()->~compressed_type(); break;
+            case COMPRESSED_SEQUENTIAL: compressed_sequential_data()->~compressed_sequential_type(); break;
         }
     }
 
     [[nodiscard]] std::tuple<uint32_t, float, int32_t> get_one_segment() const {
-        assert(one_segment);
+        assert(type == ONE_SEGMENT);
         auto n = uint32_t(raw_ptr >> (one_segment_intercept_bits + slope_bits));
         auto slope = as_float(uint32_t((raw_ptr >> one_segment_intercept_bits) & 0xFFFFFFFF));
         auto intercept = int32_t(raw_ptr & ((1ull << one_segment_intercept_bits) - 1)) - max_one_segment_intercept;
@@ -82,7 +89,7 @@ class PolymorphicPGMIndex {
     }
 
     [[nodiscard]] std::tuple<uint64_t, uint8_t, uint8_t, size_t, size_t, size_t> metadata() const {
-        assert(!one_segment && !compressed);
+        assert(type == UNCOMPRESSED);
         const uint64_t *ptr = uncompressed_data() + 1;
         uint8_t offset = 0;
         auto key_bits = sdsl::bits::read_int_and_move(ptr, offset, bit_width_bits) + 1;
@@ -100,13 +107,13 @@ class PolymorphicPGMIndex {
 
     [[nodiscard]] uint64_t segment_key_delta(size_t i, size_t segments_offset,
                                              uint8_t segment_bits, uint8_t key_bits) const {
-        assert(i > 0 && !one_segment && !compressed);
+        assert(i > 0 && type == UNCOMPRESSED);
         segments_offset += i * segment_bits - key_bits;
         return i + sdsl::bits::read_int(uncompressed_data() + segments_offset / 64, segments_offset % 64, key_bits);
     }
 
     [[nodiscard]] std::tuple<uint64_t, float, int64_t, int64_t> segment(size_t i) const {
-        assert(!one_segment && !compressed);
+        assert(type == UNCOMPRESSED);
         auto [first_key, key_bits, size_bits, size, n_segments, segments_offset] = metadata();
         segments_offset += i * (key_bits + slope_bits + size_bits) - (i > 0 ? key_bits : 0);
         const uint64_t *ptr = uncompressed_data() + segments_offset / 64;
@@ -142,14 +149,12 @@ class PolymorphicPGMIndex {
 
 public:
 
-    PolymorphicPGMIndex() : one_segment(false), compressed(false), raw_ptr(0) {}
+    PolymorphicPGMIndex() : type(), raw_ptr(0) {}
     PolymorphicPGMIndex(const PolymorphicPGMIndex &other) = delete;
     PolymorphicPGMIndex(PolymorphicPGMIndex &&other) {
-        one_segment = other.one_segment;
-        compressed = other.compressed;
+        type = other.type;
         raw_ptr = other.raw_ptr;
-        other.one_segment = false;
-        other.compressed = false;
+        other.type = ONE_SEGMENT;
         other.raw_ptr = 0;
     }
 
@@ -158,11 +163,9 @@ public:
     PolymorphicPGMIndex& operator=(PolymorphicPGMIndex &&other) {
         if (this != &other) {
             free_data();
-            one_segment = other.one_segment;
-            compressed = other.compressed;
+            type = other.type;
             raw_ptr = other.raw_ptr;
-            other.one_segment = false;
-            other.compressed = false;
+            other.type = ONE_SEGMENT;
             other.raw_ptr = 0;
         }
         return *this;
@@ -204,7 +207,7 @@ public:
         if (segments.size() == 1 && n < 1 << one_segment_size_bits) {
             auto [slope, intercept] = first_segment.get_floating_point_segment(0);
             if (intercept > -max_one_segment_intercept && intercept < max_one_segment_intercept) {
-                one_segment = true;
+                type = ONE_SEGMENT;
                 raw_ptr = n << (one_segment_intercept_bits + slope_bits);
                 raw_ptr |= uint64_t(as_uint32(slope)) << one_segment_intercept_bits;
                 raw_ptr |= int64_t(intercept) + max_one_segment_intercept;
@@ -215,12 +218,23 @@ public:
 
         auto key_bits = std::bit_width(std::max<uint64_t>(1, segments.back().key - segments.front().key - (segments.size() - 1)));
         auto size_bits = std::bit_width(n - 1);
-        auto words = words_needed(key_bits, size_bits, segments.size());
-        if (words > 4 * sizeof(succinct_pgm_type)) {
-            auto *succinct = new succinct_pgm_type(first, last, epsilon);
-            if (succinct->size_in_bytes() < words * sizeof(uint64_t)) {
-                one_segment = false;
-                compressed = true;
+        auto uncompressed_words = words_needed(key_bits, size_bits, segments.size());
+        auto uncompressed_bytes = uncompressed_words * sizeof(uint64_t);
+
+        if (uncompressed_bytes > sizeof(compressed_sequential_type) && segments.size() < 256) {
+            auto *succinct = new compressed_sequential_type(first, last, epsilon);
+            if (succinct->size_in_bytes() < uncompressed_bytes) {
+                type = COMPRESSED_SEQUENTIAL;
+                raw_ptr = reinterpret_cast<uint64_t>(succinct) >> 2;
+                assert(compressed_sequential_data() == succinct);
+                return;
+            } else {
+                delete succinct;
+            }
+        } else if (uncompressed_bytes > sizeof(compressed_type)) {
+            auto *succinct = new compressed_type(first, last, epsilon);
+            if (succinct->size_in_bytes() < uncompressed_bytes) {
+                type = COMPRESSED;
                 raw_ptr = reinterpret_cast<uint64_t>(succinct) >> 2;
                 assert(compressed_data() == succinct);
                 return;
@@ -229,9 +243,8 @@ public:
             }
         }
 
-        auto ptr = new(align_val) uint64_t[words];
-        one_segment = false;
-        compressed = false;
+        auto ptr = new(align_val) uint64_t[uncompressed_words];
+        type = UNCOMPRESSED;
         raw_ptr = reinterpret_cast<uint64_t>(ptr) >> 2;
         assert(uncompressed_data() == ptr);
 
@@ -253,13 +266,15 @@ public:
 
     /** Returns the approximate rank of @p key. */
     [[nodiscard]] size_t approximate_rank(const K &key) const {
-        if (one_segment) {
+        if (type == ONE_SEGMENT) {
             auto [n, slope, intercept] = get_one_segment();
             auto p = int64_t(std::round(key * slope)) + intercept;
             return std::min<size_t>(p > 0 ? size_t(p) : 0ull, n - 1);
         }
-        if (compressed)
+        if (type == COMPRESSED)
             return compressed_data()->approximate_rank(key);
+        if (type == COMPRESSED_SEQUENTIAL)
+            return compressed_sequential_data()->approximate_rank(key);
 
         auto [first_key, key_bits, size_bits, size, n_segments, segments_offset] = metadata();
         if (key < first_key)
@@ -295,7 +310,7 @@ public:
      * an iterator to the current key and the corresponding approximate rank computed by the index. */
     template<typename ForwardIt, typename F>
     void for_each(ForwardIt first, ForwardIt last, F f) const {
-        if (one_segment) {
+        if (type == ONE_SEGMENT) {
             auto [n, slope, intercept] = get_one_segment();
             while (first != last) {
                 auto p = int64_t(std::round(*first * slope)) + intercept;
@@ -304,8 +319,12 @@ public:
             }
             return;
         }
-        if (compressed) {
+        if (type == COMPRESSED) {
             compressed_data()->for_each(first, last, f);
+            return;
+        }
+        if (type == COMPRESSED_SEQUENTIAL) {
+            compressed_sequential_data()->for_each(first, last, f);
             return;
         }
 
@@ -336,28 +355,34 @@ public:
 
     /** Returns the number of output buckets. (Compressed version of number of input objects) */
     [[nodiscard]] size_t size() const {
-        if (one_segment)
+        if (type == ONE_SEGMENT)
             return std::get<0>(get_one_segment());
-        if (compressed)
+        if (type == COMPRESSED)
             return compressed_data()->size();
+        if (type == COMPRESSED_SEQUENTIAL)
+            return compressed_sequential_data()->size();
         return std::get<3>(metadata());
     }
 
     /** Returns the number of segments in the index. */
     [[nodiscard]] size_t segments_count() const {
-        if (one_segment)
+        if (type == ONE_SEGMENT)
             return 1;
-        if (compressed)
+        if (type == COMPRESSED)
             return compressed_data()->segments_count();
+        if (type == COMPRESSED_SEQUENTIAL)
+            return compressed_sequential_data()->segments_count();
         return std::get<4>(metadata());
     }
 
     /**  Returns the size of the index in bytes. */
     [[nodiscard]] size_t size_in_bytes() const {
-        if (one_segment)
+        if (type == ONE_SEGMENT)
             return sizeof(*this);
-        if (compressed)
+        if (type == COMPRESSED)
             return sizeof(*this) + compressed_data()->size_in_bytes();
+        if (type == COMPRESSED_SEQUENTIAL)
+            return sizeof(*this) + compressed_sequential_data()->size_in_bytes();
         auto [_, key_bits, size_bits, _1, n_segments, _2] = metadata();
         return sizeof(*this) + words_needed(key_bits, size_bits, n_segments) * sizeof(uint64_t);
     }
