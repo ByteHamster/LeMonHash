@@ -202,10 +202,14 @@ public:
         return ((bit_size + 63) / 64) * sizeof(uint64_t);
     }
 
-    [[nodiscard]] uint8_t epsilon_value() const { return sdsl::bits::read_int(data, key_bit_width, epsilon_bit_width); }
+    [[nodiscard]] uint8_t epsilon_value() const {
+        auto bit_offset = key_bit_width;
+        return sdsl::bits::read_int(data + bit_offset / 64, bit_offset % 64, epsilon_bit_width);
+    }
 
     [[nodiscard]] size_t segments_count() const {
-        return sdsl::bits::read_int(data, key_bit_width + epsilon_bit_width, nsegments_bit_width);
+        auto bit_offset = key_bit_width + epsilon_bit_width;
+        return sdsl::bits::read_int(data + bit_offset / 64, bit_offset % 64, nsegments_bit_width);
     }
 
     [[nodiscard]] uint64_t first_key() const {
@@ -264,7 +268,8 @@ private:
     size_t xs_offset() const { return yshifts_offset() + yshifts_size() * yshift_bit_width(epsilon_value()); }
 
     size_t ys_offset() const {
-        return xs_offset() + sdsl::bits::read_int(data, epsilon_bit_width + nsegments_bit_width, bit_offset_width);
+        auto bit_offset = key_bit_width + epsilon_bit_width + nsegments_bit_width;
+        return xs_offset() + sdsl::bits::read_int(data + bit_offset / 64, bit_offset % 64, bit_offset_width);
     }
 
     uint64_t get_yshift(size_t index) const {
