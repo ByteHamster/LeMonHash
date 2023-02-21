@@ -50,8 +50,8 @@ struct AlphabetMap {
             if (branchingCharacters) {
                 for (auto it = begin + 1; it != end; ++it) {
                     auto lcp = LCP(std::string_view(*it).substr(fromIndex), std::string_view(*(it - 1)).substr(fromIndex));
-                    uint8_t c0 = (*std::prev(it))[fromIndex + lcp];
-                    uint8_t c1 = (*it)[fromIndex + lcp];
+                    uint8_t c0 = (*std::prev(it))[fromIndex + lcp.lcp];
+                    uint8_t c1 = (*it)[fromIndex + lcp.lcp];
                     set(c0);
                     set(c1);
                 }
@@ -65,17 +65,12 @@ struct AlphabetMap {
         /** Constructs from the alphabet of branching characters in the compacted trie of the strings in the given range,
          * which must be sorted lexicographically, by using a precomputed LCP array.
          * If terminator is true, then '\0' is part of the alphabet. */
-        AlphabetMap(const auto begin, const auto end, const auto lcpsBegin, bool terminator = true) {
-            if (terminator)
-                set(0);
-
-            auto itLcps = lcpsBegin + 1;
-            for (auto it = begin + 1; it != end; ++it, ++itLcps) {
-                auto lcp = *itLcps;
-                uint8_t c0 = (*std::prev(it))[lcp];
-                uint8_t c1 = (*it)[lcp];
-                set(c0);
-                set(c1);
+        AlphabetMap(const auto lcpsBegin, size_t n) {
+            set(0);
+            for (size_t i = 1; i < n; i++) {
+                auto lcp = lcpsBegin[i];
+                set(lcp.branchingCharacter0);
+                set(lcp.branchingCharacter1);
             }
         }
 

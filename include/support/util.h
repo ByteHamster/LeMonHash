@@ -6,7 +6,13 @@
 #include <algorithm>
 #include <bit>
 
-size_t LCP(const auto &s1, const auto &s2) {
+struct LcpDetails {
+    uint32_t lcp;
+    char branchingCharacter0;
+    char branchingCharacter1;
+};
+
+LcpDetails LCP(const auto &s1, const auto &s2) {
     size_t lcp = 0;
     size_t minLength = std::min(s1.length(), s2.length());
     const char* s1ptr = s1.data();
@@ -21,38 +27,39 @@ size_t LCP(const auto &s1, const auto &s2) {
             lcp++;
         }
     }
-    return lcp;
+    char branchingCharacter0 = lcp < s1.length() ? s1ptr[lcp] : '\0';
+    char branchingCharacter1 = lcp < s2.length() ? s2ptr[lcp] : '\0';
+    return {static_cast<uint32_t>(lcp), branchingCharacter0, branchingCharacter1};
 }
 
-std::vector<uint32_t> computeLCPs(const auto begin, const auto end) {
-    std::vector<uint32_t> lcps(std::distance(begin, end));
+std::vector<LcpDetails> computeLCPs(const auto begin, const auto end) {
+    std::vector<LcpDetails> lcps(std::distance(begin, end));
     for (auto it = begin + 1; it != end; ++it)
-        lcps[std::distance(begin, it)] = LCP(*it, *std::prev(it));
+        lcps[std::distance(begin, it)] = LCP(*std::prev(it), *it);
     return lcps;
 }
 
 /** Finds k distinct elements >= lowerBound in the range [begin, end) and returns them in a sorted vector. */
 auto distinctMinima(const auto begin, const auto end, size_t k, auto lowerBound) {
     // TODO: The algorithm below costs O((end-begin)log(k))
-    using value_type = typename decltype(begin)::value_type;
-    std::set<value_type> s;
+    std::set<size_t> s;
 
     auto it = begin;
     while (it != end && s.size() < k) {
-        if (*it >= lowerBound)
-            s.insert(*it);
+        if ((*it).lcp >= lowerBound)
+            s.insert((*it).lcp);
         ++it;
     }
 
     for (; it != end; ++it) {
-        if (*it >= lowerBound && (s.empty() || *it < *std::prev(s.end())) && !s.contains(*it)) {
+        if ((*it).lcp >= lowerBound && (s.empty() || (*it).lcp < *std::prev(s.end())) && !s.contains((*it).lcp)) {
             if (!s.empty())
                 s.erase(std::prev(s.end()));
-            s.insert(*it);
+            s.insert((*it).lcp);
         }
     }
 
-    std::vector<value_type> result;
+    std::vector<size_t> result;
     result.reserve(s.size());
     std::copy(s.begin(), s.end(), std::back_inserter(result));
     return result;

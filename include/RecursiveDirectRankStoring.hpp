@@ -185,10 +185,11 @@ class RecursiveDirectRankStoringMmphf {
 
             TreeNode treeNode;
             treeNode.offsetsOffset = bucketOffsets.at(layer).size();
-            treeNode.minLCP = *std::min_element(lcpsBegin + 1, lcpsBegin + nThisNode);
+            treeNode.minLCP = (*std::min_element(lcpsBegin + 1, lcpsBegin + nThisNode,
+                                [](const LcpDetails& x, const LcpDetails& y) {  return x.lcp < y.lcp; })).lcp;
 
             if (!alphabetMaps.isFullForBits(LOG2_ALPHABET_MAPS_COUNT) && nThisNode > ALPHABET_MAPS_THRESHOLD) {
-                AlphabetMap am(begin, end, lcpsBegin);
+                AlphabetMap am(lcpsBegin, nThisNode);
                 if (!alphabetMaps.empty() && am.length64() == alphabetMaps.length64(ancestorAlphabetMapIndex)) {
                     treeNode.alphabetMapIndex = ancestorAlphabetMapIndex;
                 } else {
@@ -287,7 +288,7 @@ class RecursiveDirectRankStoringMmphf {
 
             auto itLcps = lcpsBegin + 1;
             for (auto it = begin + 1; it != end; ++it, ++itLcps) {
-                bool isChunkDistinct = *itLcps - treeNode.minLCP < chunkWidth;
+                bool isChunkDistinct = (*itLcps).lcp - treeNode.minLCP < chunkWidth;
                 if (isChunkDistinct) {
                     uint64_t chunk = extractChunk(*it, treeNode);
                     assert(chunk >= previousChunk);
@@ -507,7 +508,7 @@ class RecursiveDirectRankStoringV2Mmphf {
                 packedIndexes = 0;
                 packedIndexes |= indexes[0];
                 size_t previous = indexes[0];
-                std::vector<uint32_t> storedIndexes = { indexes[0] };
+                std::vector<uint32_t> storedIndexes = { static_cast<uint32_t>(indexes[0]) };
                 storedIndexes.reserve(maxIndexesCount);
                 for (size_t deltaSlot = 0, i = 1; deltaSlot < maxIndexesCount - 1u && i < indexes.size(); ++deltaSlot) {
                     if (indexes[i] - previous >= maxDeltaValue) { // indexes[i] will span this slot and the next one(s)
@@ -625,7 +626,7 @@ class RecursiveDirectRankStoringV2Mmphf {
             treeNode.offsetsOffset = bucketOffsets.at(layer).size();
 
             if (!alphabetMaps.isFullForBits(LOG2_ALPHABET_MAPS_COUNT) && nThisNode > ALPHABET_MAPS_THRESHOLD) {
-                AlphabetMap am(begin, end, lcpsBegin);
+                AlphabetMap am(lcpsBegin, nThisNode);
                 if (!alphabetMaps.empty() && am.length64() == alphabetMaps.length64(ancestorAlphabetMapIndex)) {
                     treeNode.alphabetMapIndex = ancestorAlphabetMapIndex;
                 } else {
