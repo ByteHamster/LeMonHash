@@ -16,9 +16,14 @@ struct PGMBucketMapper : public BucketMapper {
     PGMBucketMapper(RandomIt begin, RandomIt end) {
         auto best_space = std::numeric_limits<size_t>::max();
 
-        for (auto epsilon : {3, 7, 15, 31, 63}) {
+        for (auto epsilon : {63, 31, 15, 7, 3}) {
             pgm::PGMIndex<uint64_t> pgm(begin, end, epsilon);
 
+            size_t space = pgm.size_in_bytes();
+            if (space >= best_space) {
+                // If PGM alone already is larger, additional epsilon parameters will be larger as well.
+                break;
+            }
             std::vector<size_t> bucket_sizes(std::distance(begin, end) + 1);
             pgm.for_each(begin, end, [&] (auto, auto approx_rank) {
                 ++bucket_sizes[approx_rank];
@@ -28,14 +33,11 @@ struct PGMBucketMapper : public BucketMapper {
             for (auto b: bucket_sizes)
                 ranks_bits += b <= 1 ? 0ull : b * std::bit_width(b - 1);
 
-            auto segmentsCount = pgm.segments_count();
-            auto space = pgm.size_in_bytes() + ranks_bits / 8;
+            space += ranks_bits / 8;
             if (space < best_space) {
                 pgmIndex = std::move(pgm);
                 best_space = space;
             }
-            if (segmentsCount == 1)
-                break;
         }
 
         numBuckets_ = bucketOf(*std::prev(end)) + 1;

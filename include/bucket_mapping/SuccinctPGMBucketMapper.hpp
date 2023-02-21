@@ -47,19 +47,19 @@ struct SuccinctPGMBucketMapper {
         bestCost = cost;
 
         // Evaluate PGM
-        for (auto epsilon : {3, 7, 15, 31, 63}) {
+        for (auto epsilon : {63, 31, 15, 7, 3}) {
             auto *pgm = new pgm::SuccinctPGMIndex<>(begin, end, epsilon);
 
             cost = pgm->size_in_bytes() * 8;
-            // If the cost of the PGM alone already is larger, we do not need to run for_each
-            if (cost < bestCost) {
-                previousBucket = 0;
-                bucketBegin = begin;
-                pgm->for_each(begin, end, updateCost);
-                updateCost(end, std::numeric_limits<uint64_t>::max());
+            if (cost >= bestCost) {
+                // If PGM alone already is larger, additional epsilon parameters will be larger as well.
+                break;
             }
+            previousBucket = 0;
+            bucketBegin = begin;
+            pgm->for_each(begin, end, updateCost);
+            updateCost(end, std::numeric_limits<uint64_t>::max());
 
-            auto segmentsCount = pgm->segments_count();
             if (cost < bestCost) {
                 if (usesPgmIndex) {
                     delete pgmIndex;
@@ -71,8 +71,6 @@ struct SuccinctPGMBucketMapper {
             } else {
                 delete pgm;
             }
-            if (segmentsCount == 1)
-                break;
         }
     }
 
