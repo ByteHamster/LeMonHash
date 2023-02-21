@@ -14,8 +14,12 @@ size_t LCP(const auto &s1, const auto &s2) {
     while (lcp < minLength - 8 && *(uint64_t*)(&s1ptr[lcp]) == *(uint64_t*)(&s2ptr[lcp])) {
         lcp += 8;
     }
-    while (lcp < minLength && s1ptr[lcp] == s2ptr[lcp]) {
-        lcp++;
+    if (lcp < minLength - 8) {
+        lcp += std::countr_zero(*(uint64_t*)(&s1ptr[lcp]) ^ *(uint64_t*)(&s2ptr[lcp])) / 8;
+    } else {
+        while (lcp < minLength && s1ptr[lcp] == s2ptr[lcp]) {
+            lcp++;
+        }
     }
     return lcp;
 }
