@@ -3,6 +3,8 @@
 #include <sdsl/int_vector.hpp>
 #include "OptimalPiecewiseLinearModel.hpp"
 #include "EliasFanoModified.hpp"
+#include <compact_elias_fano.hpp>
+#include <strict_elias_fano.hpp>
 
 namespace pgm {
 
@@ -52,14 +54,6 @@ struct EFPointsStorage {
         ++np;
         auto [y0, y1, y2] = get_ys(p.index());
         return {p.index(), *p, *np, y0, y1, y2};
-    }
-
-    [[nodiscard]] std::tuple<uint64_t, uint64_t, int64_t, int64_t, int64_t> segment_at(size_t i) const {
-        auto p = xs->at(i);
-        auto np = p;
-        ++np;
-        auto [y0, y1, y2] = get_ys(i);
-        return {*p, *np, y0, y1, y2};
     }
 
     [[nodiscard]] uint64_t first_key() const { return first; }
@@ -113,6 +107,203 @@ private:
         return {y0 - shift1, y1 - shift2, y1 - shift3};
     }
 };
+
+/** Store points using Elias-Fano representations with support for random access. */
+class EFPointsStorageV2 {
+    using xs_type = ds2i::compact_elias_fano;
+    using ys_type = ds2i::strict_elias_fano;
+    succinct::bit_vector bv;
+
+    static ds2i::global_parameters xs_params;
+    static ds2i::global_parameters ys_params;
+
+    // data layout:
+    // first_key in key_bit_width bits
+    // xs's universe size in key_bit_width bits
+    // ys's universe size in size_bit_width bits
+    // epsilon in epsilon_bit_width bits
+    // nsegments in nsegments_bit_width bits
+    // encoding size of xs in bit_offset_width bits
+    // encoding size of ys in bit_offset_width bits
+    // (nsegments*2+1) yshifts, each in yshift_bit_width(epsilon) bits
+    // xs in Elias-Fano representation
+    // ys in Elias-Fano representation
+
+    static constexpr uint8_t key_bit_width = 64;
+    static constexpr uint8_t size_bit_width = 28;
+    static constexpr uint8_t epsilon_bit_width = 8;
+    static constexpr uint8_t nsegments_bit_width = 24;
+
+public:
+
+    EFPointsStorageV2() {
+        static bool execute_once = [](){
+            ys_params.ef_log_sampling0 = 63; // rank is not needed on the ys
+            return true;
+        } ();
+    }
+
+    void load(uint64_t first, const auto &xs_data, const auto &ys_data, const auto &yshifts_data, uint8_t epsilon) {
+        auto xs_bit_size = xs_type::bitsize(xs_params, xs_data.back() + 1, xs_data.size());
+        auto ys_bit_size = ys_type::bitsize(ys_params, ys_data.back() + 1, ys_data.size());
+
+        auto yshift_width = yshift_bit_width(epsilon);
+        auto total_bit_size = key_bit_width + key_bit_width + size_bit_width + epsilon_bit_width + nsegments_bit_width
+            + yshifts_data.size() * yshift_width + xs_bit_size + ys_bit_size;
+
+        succinct::bit_vector_builder bvb;
+        bvb.reserve(total_bit_size);
+        auto nsegments = xs_data.size() - 1;
+
+        bvb.append_bits(first, key_bit_width);
+        bvb.append_bits(xs_data.back() + 1, key_bit_width);
+        bvb.append_bits(ys_data.back() + 1, size_bit_width);
+        bvb.append_bits(epsilon, epsilon_bit_width);
+        bvb.append_bits(nsegments, nsegments_bit_width);
+
+        for (size_t i = 0; i < yshifts_data.size(); ++i)
+            bvb.append_bits(yshifts_data[i], yshift_width);
+
+        xs_type::write(bvb, xs_data.begin(), xs_data.back() + 1, xs_data.size(), xs_params);
+        ys_type::write(bvb, ys_data.begin(), ys_data.back() + 1, ys_data.size(), ys_params);
+
+        succinct::bit_vector(&bvb).swap(bv);
+
+        assert(first_key() == first);
+        assert(epsilon_value() == epsilon);
+        assert(size() == ys_data.back());
+        assert(segments_count() == nsegments);
+        assert(xs_size() == xs_data.size());
+        assert(ys_size() == ys_data.size());
+        assert(xs_universe() == xs_data.back() + 1);
+        assert(ys_universe() == ys_data.back() + 1);
+    }
+
+    [[nodiscard]] std::tuple<size_t, uint64_t, uint64_t, int64_t, int64_t, int64_t> segment_for_key(auto key) const {
+        auto xs_it = xs_enumerator();
+        auto next_geq = xs_it.next_geq(key);
+        uint64_t x0, x1, pos;
+        if (next_geq.first >= xs_size() - 1) {
+            std::tie(pos, x0) = xs_it.move(xs_size() - 2);
+            x1 = xs_it.next().second;
+        } else if (next_geq.second != key && next_geq.first > 0) {
+            x0 = xs_it.prev_value();
+            x1 = next_geq.second;
+            pos = next_geq.first - 1;
+        } else {
+            x0 = next_geq.second;
+            x1 = xs_it.next().second;
+            pos = next_geq.first;
+        }
+
+        auto [y0, y1, y2] = get_ys(pos);
+        return {pos, x0, x1, y0, y1, y2};
+    }
+
+    [[nodiscard]] size_t size() const {
+        auto bit_offset = key_bit_width + key_bit_width;
+        return bv.get_bits(bit_offset, size_bit_width) - 1;
+    }
+
+    [[nodiscard]] size_t size_in_bytes() const { return bv.size() / 8; }
+
+    [[nodiscard]] uint8_t epsilon_value() const {
+        auto bit_offset = key_bit_width + key_bit_width + size_bit_width;
+        return bv.get_bits(bit_offset, epsilon_bit_width);
+    }
+
+    [[nodiscard]] size_t segments_count() const {
+        auto bit_offset = key_bit_width + key_bit_width + size_bit_width + epsilon_bit_width;
+        return bv.get_bits(bit_offset, nsegments_bit_width);
+    }
+
+    [[nodiscard]] uint64_t first_key() const {
+        return bv.get_bits(0, key_bit_width);
+    }
+
+    class Iterator {
+        xs_type::enumerator xs_it;
+        ys_type::enumerator ys_it;
+        uint64_t x_value;
+        uint64_t y_value;
+        const EFPointsStorageV2 *storage;
+
+    public:
+
+        Iterator(xs_type::enumerator xs_it, ys_type::enumerator ys_it, const EFPointsStorageV2 *storage)
+            : xs_it(xs_it), ys_it(ys_it), storage(storage) {
+            x_value = this->xs_it.move(0).second;
+            y_value = this->ys_it.move(0).second;
+        }
+
+        std::tuple<uint64_t, uint64_t, int64_t, int64_t, int64_t> operator*() {
+            auto tmp1 = xs_it;
+            auto tmp2 = ys_it;
+            auto x0 = x_value;
+            auto x1 = tmp1.next().second;
+            auto y0 = y_value;
+            auto y1 = tmp2.next().second;
+            auto point_index = xs_it.position();
+            int64_t epsilon = storage->epsilon_value();
+            auto shift1 = int64_t(storage->get_yshift(point_index * 2)) - epsilon;
+            auto shift2 = int64_t(storage->get_yshift(point_index * 2 + 1)) - epsilon;
+            auto shift3 = int64_t(storage->get_yshift(point_index * 2 + 2)) - epsilon;
+            return {x0, x1, y0 - shift1, y1 - shift2, y1 - shift3};
+        }
+
+        void operator++() {
+            x_value = xs_it.next().second;
+            y_value = ys_it.next().second;
+        }
+    };
+
+    Iterator begin() const { return {xs_enumerator(), ys_enumerator(), this}; }
+
+private:
+
+    xs_type::enumerator xs_enumerator() const { return {bv, xs_offset(), xs_universe(), xs_size(), xs_params}; }
+
+    ys_type::enumerator ys_enumerator() const { return {bv, ys_offset(), ys_universe(), ys_size(), ys_params}; }
+
+    uint64_t xs_universe() const { return bv.get_bits(key_bit_width, key_bit_width); }
+
+    uint64_t ys_universe() const { return size() + 1; }
+
+    size_t xs_size() const { return segments_count() + 1; }
+
+    size_t ys_size() const { return segments_count() + 2; }
+
+    size_t yshifts_size() const { return segments_count() * 2 + 1; }
+
+    size_t yshifts_offset() const {
+        return key_bit_width + key_bit_width + size_bit_width + epsilon_bit_width + nsegments_bit_width;
+    }
+
+    size_t xs_offset() const { return yshifts_offset() + yshifts_size() * yshift_bit_width(epsilon_value()); }
+
+    size_t ys_offset() const {
+        return xs_offset() + xs_type::bitsize(xs_params, xs_universe(), xs_size());
+    }
+
+    uint64_t get_yshift(size_t index) const {
+        auto bit_offset = yshifts_offset() + index * yshift_bit_width(epsilon_value());
+        return bv.get_bits(bit_offset, yshift_bit_width(epsilon_value()));
+    }
+
+    [[nodiscard]] std::tuple<int64_t, int64_t, int64_t> get_ys(size_t point_index) const {
+        auto it = ys_enumerator();
+        int64_t y0 = it.move(point_index).second;
+        int64_t y1 = it.next().second;
+        int64_t epsilon = epsilon_value();
+        auto shift1 = int64_t(get_yshift(point_index * 2)) - epsilon;
+        auto shift2 = int64_t(get_yshift(point_index * 2 + 1)) - epsilon;
+        auto shift3 = int64_t(get_yshift(point_index * 2 + 2)) - epsilon;
+        return {y0 - shift1, y1 - shift2, y1 - shift3};
+    }
+};
+
+ds2i::global_parameters EFPointsStorageV2::xs_params = {};
+ds2i::global_parameters EFPointsStorageV2::ys_params = {};
 
 /** Store points using Elias-Fano representations without support for efficient random access. */
 class EFSequentialPointsStorage {
@@ -183,15 +374,6 @@ public:
         auto x0 = *it;
         auto [y0, y1, y2] = get_ys(it.index());
         return {it.index(), x0, x1, y0, y1, y2};
-    }
-
-    [[nodiscard]] std::tuple<uint64_t, uint64_t, int64_t, int64_t, int64_t> segment_at(size_t i) const {
-        EFIterator it(data, xs_offset(), xs_size());
-        auto x0 = it.at(i);
-        ++it;
-        auto x1 = *it;
-        auto [y0, y1, y2] = get_ys(i);
-        return {x0, x1, y0, y1, y2};
     }
 
     [[nodiscard]] size_t size() const { return EFIterator(data, ys_offset(), ys_size()).at(ys_size() - 1); }
