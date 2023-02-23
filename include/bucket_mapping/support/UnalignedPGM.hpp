@@ -41,10 +41,11 @@ class UnalignedPGMIndex {
     //   first_key in first_key_bits
     //   key_bits-1 in bit_width_bits
     //   size_bits-1 in bit_width_bits
+    //   intercept_bits-1 in bit_width_bits
     //   size-1 in size_bits
     //   n_segments-1 in size_bits
-    //   first segment (slope, intercept) in (slope_bits, size_bits)
-    //   remaining segments, where ith segment: (key-first_key-i, slope, intercept) in (key_bits, slope_bits, size_bits)
+    //   first segment (slope, intercept) in (slope_bits, intercept_bits)
+    //   remaining segments, where ith segment: (key-first_key-i, slope, intercept-i) in (key_bits, slope_bits, intercept_bits)
 
     [[nodiscard]] uint64_t *data() const {
         assert(!one_segment);
@@ -64,20 +65,21 @@ class UnalignedPGMIndex {
         return {n, slope, intercept};
     }
 
-    [[nodiscard]] std::tuple<uint64_t, uint8_t, uint8_t, size_t, size_t, size_t> metadata() const {
+    [[nodiscard]] std::tuple<uint64_t, uint8_t, uint8_t, uint8_t, size_t, size_t, size_t> metadata() const {
         assert(!one_segment);
         const uint64_t *ptr = data() + 1;
         uint8_t offset = 0;
         auto key_bits = sdsl::bits::read_int_and_move(ptr, offset, bit_width_bits) + 1;
         auto size_bits = sdsl::bits::read_int_and_move(ptr, offset, bit_width_bits) + 1;
+        auto intercept_bits = sdsl::bits::read_int_and_move(ptr, offset, bit_width_bits) + 1;
         auto size = sdsl::bits::read_int_and_move(ptr, offset, size_bits) + 1;
         auto n_segments = sdsl::bits::read_int_and_move(ptr, offset, size_bits) + 1;
-        return {data()[0], key_bits, size_bits, size, n_segments, 64 * (ptr - data()) + offset};
+        return {data()[0], key_bits, size_bits, intercept_bits, size, n_segments, 64 * (ptr - data()) + offset};
     }
 
-    static size_t words_needed(uint8_t key_bits, uint8_t size_bits, size_t n_segments) {
+    static size_t words_needed(uint8_t key_bits, uint8_t size_bits, uint8_t intercept_bits, size_t n_segments) {
         auto bits = first_key_bits + 2 * bit_width_bits + 2 * size_bits
-            + (key_bits + slope_bits + size_bits) * n_segments - key_bits;
+            + (key_bits + slope_bits + intercept_bits) * n_segments - key_bits;
         return (bits + 63) / 64;
     }
 
@@ -89,8 +91,8 @@ class UnalignedPGMIndex {
     }
 
     [[nodiscard]] std::tuple<uint64_t, float, int64_t, int64_t> segment(size_t i) const {
-        auto [first_key, key_bits, size_bits, size, n_segments, segments_offset] = metadata();
-        segments_offset += i * (key_bits + slope_bits + size_bits) - (i > 0 ? key_bits : 0);
+        auto [first_key, key_bits, size_bits, intercept_bits, size, n_segments, segments_offset] = metadata();
+        segments_offset += i * (key_bits + slope_bits + intercept_bits) - (i > 0 ? key_bits : 0);
         const uint64_t *ptr = data() + segments_offset / 64;
         uint8_t offset = segments_offset % 64;
 
@@ -98,13 +100,13 @@ class UnalignedPGMIndex {
         if (i > 0)
             key += i + sdsl::bits::read_int_and_move(ptr, offset, key_bits);
         auto slope = as_float(sdsl::bits::read_int_and_move(ptr, offset, slope_bits));
-        auto intercept = int64_t(sdsl::bits::read_int_and_move(ptr, offset, size_bits));
+        auto intercept = int64_t(sdsl::bits::read_int_and_move(ptr, offset, intercept_bits)) + i;
 
         auto next_intercept = int64_t(size);
         if (i + 1 < n_segments) {
             sdsl::bits::move_right(ptr, offset, key_bits);
             sdsl::bits::move_right(ptr, offset, slope_bits);
-            next_intercept = int64_t(sdsl::bits::read_int(ptr, offset, size_bits));
+            next_intercept = int64_t(sdsl::bits::read_int(ptr, offset, intercept_bits)) + i + 1;
         }
 
         return {key, slope, intercept, next_intercept};
@@ -193,7 +195,8 @@ public:
 
         auto key_bits = std::bit_width(std::max<uint64_t>(1, segments.back().key - segments.front().key - (segments.size() - 1)));
         auto size_bits = std::bit_width(n - 1);
-        auto ptr = new(align_val) uint64_t[words_needed(key_bits, size_bits, segments.size())];
+        auto intercept_bits = std::bit_width(std::max<uint64_t>(1, segments.back().intercept - (segments.size() - 1)));
+        auto ptr = new(align_val) uint64_t[words_needed(key_bits, size_bits, intercept_bits, segments.size())];
         one_segment = false;
         raw_ptr = reinterpret_cast<uint64_t>(ptr) >> 1;
         assert(reinterpret_cast<uint64_t>(ptr) == raw_ptr << 1);
@@ -202,6 +205,7 @@ public:
         sdsl::bits::write_int_and_move(ptr, segments.front().key, offset, first_key_bits);
         sdsl::bits::write_int_and_move(ptr, key_bits - 1, offset, bit_width_bits);
         sdsl::bits::write_int_and_move(ptr, size_bits - 1, offset, bit_width_bits);
+        sdsl::bits::write_int_and_move(ptr, intercept_bits - 1, offset, bit_width_bits);
         sdsl::bits::write_int_and_move(ptr, std::min(n, (size_t) after_last_point_of_previous_segment) - 1, offset, size_bits);
         sdsl::bits::write_int_and_move(ptr, segments.size() - 1, offset, size_bits);
 
@@ -210,7 +214,7 @@ public:
             if (i > 0)
                 sdsl::bits::write_int_and_move(ptr, segments[i].key - segments[0].key - i, offset, key_bits);
             sdsl::bits::write_int_and_move(ptr, as_uint32(segments[i].slope), offset, slope_bits);
-            sdsl::bits::write_int_and_move(ptr, segments[i].intercept, offset, size_bits);
+            sdsl::bits::write_int_and_move(ptr, segments[i].intercept - i, offset, intercept_bits);
         }
     }
 
@@ -222,11 +226,11 @@ public:
             return std::min<size_t>(p > 0 ? size_t(p) : 0ull, n - 1);
         }
 
-        auto [first_key, key_bits, size_bits, size, n_segments, segments_offset] = metadata();
+        auto [first_key, key_bits, size_bits, intercept_bits, size, n_segments, segments_offset] = metadata();
         if (key < first_key)
             return 0;
 
-        auto segment_bits = key_bits + slope_bits + size_bits;
+        auto segment_bits = key_bits + slope_bits + intercept_bits;
         auto key_delta = key - first_key;
         size_t i = 1;
 
@@ -266,8 +270,8 @@ public:
             return;
         }
 
-        auto [first_key, key_bits, size_bits, size, n_segments, segments_offset] = metadata();
-        auto segment_bits = key_bits + slope_bits + size_bits;
+        auto [first_key, key_bits, size_bits, intercept_bits, size, n_segments, segments_offset] = metadata();
+        auto segment_bits = key_bits + slope_bits + intercept_bits;
         auto [segment_key, slope, intercept, next_intercept] = segment(0);
         auto next_segment_key = first_key + segment_key_delta(1, segments_offset, segment_bits, key_bits);
         size_t segment_i = 0;
@@ -293,20 +297,20 @@ public:
 
     /** Returns the number of output buckets. (Compressed version of number of input objects) */
     [[nodiscard]] size_t size() const {
-        return one_segment ? std::get<0>(get_one_segment()) : std::get<3>(metadata());
+        return one_segment ? std::get<0>(get_one_segment()) : std::get<4>(metadata());
     }
 
     /** Returns the number of segments in the index. */
     [[nodiscard]] size_t segments_count() const {
-        return one_segment ? 1 : std::get<4>(metadata());
+        return one_segment ? 1 : std::get<5>(metadata());
     }
 
     /**  Returns the size of the index in bytes. */
     [[nodiscard]] size_t size_in_bytes() const {
         if (one_segment)
             return sizeof(*this);
-        auto [_, key_bits, size_bits, _1, n_segments, _2] = metadata();
-        return sizeof(*this) + words_needed(key_bits, size_bits, n_segments) * sizeof(uint64_t);
+        auto [_, key_bits, size_bits, intercept_bits, _1, n_segments, _2] = metadata();
+        return sizeof(*this) + words_needed(key_bits, size_bits, intercept_bits, n_segments) * sizeof(uint64_t);
     }
 };
 

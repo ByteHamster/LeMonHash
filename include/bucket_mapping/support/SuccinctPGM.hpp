@@ -28,11 +28,12 @@ struct EFPointsStorage {
         this->first = first;
         this->epsilon = epsilon;
         xs = new xs_type(xs_data.size(), xs_data.back() + 1);
-        ys = new ys_type(ys_data.size(), ys_data.back() + 1);
+        ys = new ys_type(ys_data.size(), ys_data.back() - ys_data.size() + 2);
         for (auto x: xs_data)
             xs->push_back(x);
+        size_t i = 0;
         for (auto y: ys_data)
-            ys->push_back(y);
+            ys->push_back(y - i++);
         xs->buildRankSelect();
         ys->buildRankSelect();
         yshifts.width(yshift_bit_width(epsilon));
@@ -44,7 +45,7 @@ struct EFPointsStorage {
 
     [[nodiscard]] uint8_t epsilon_value() const { return epsilon; }
 
-    [[nodiscard]] size_t size() const { return *ys->at(ys->size() - 1); }
+    [[nodiscard]] size_t size() const { return *ys->at(ys->size() - 1) + ys->size() - 1; }
 
     [[nodiscard]] size_t segments_count() const { return xs->size() - 1; }
 
@@ -78,8 +79,9 @@ struct EFPointsStorage {
             auto x0 = *tmp1;
             auto x1 = *++tmp1;
             auto tmp2 = ys_it;
-            auto y0 = *tmp2;
-            auto y1 = *++tmp2;
+            auto y0 = *tmp2 + tmp2.index();
+            ++tmp2;
+            auto y1 = *tmp2 + tmp2.index();
             auto point_index = xs_it.index();
             auto shift1 = int64_t(storage->yshifts[point_index * 2]) - int64_t(storage->epsilon);
             auto shift2 = int64_t(storage->yshifts[point_index * 2 + 1]) - int64_t(storage->epsilon);
@@ -99,8 +101,8 @@ private:
 
     [[nodiscard]] std::tuple<int64_t, int64_t, int64_t> get_ys(size_t point_index) const {
         auto p = ys->at(point_index);
-        int64_t y0 = *p;
-        int64_t y1 = *++p;
+        int64_t y0 = *p + point_index;
+        int64_t y1 = *++p + point_index + 1;
         auto shift1 = int64_t(yshifts[point_index * 2]) - int64_t(epsilon);
         auto shift2 = int64_t(yshifts[point_index * 2 + 1]) - int64_t(epsilon);
         auto shift3 = int64_t(yshifts[point_index * 2 + 2]) - int64_t(epsilon);
@@ -329,7 +331,9 @@ public:
 
     EFSequentialPointsStorage() = default;
 
-    void load(uint64_t first, const auto &xs_data, const auto &ys_data, const auto &yshifts_data, uint8_t epsilon) {
+    void load(uint64_t first, const auto &xs_data, auto &ys_data, const auto &yshifts_data, uint8_t epsilon) {
+        for (size_t i = 0; i < ys_data.size(); ++i)
+            ys_data[i] -= i;
         auto xs_bit_size = util::SequentialEliasFano::encodingSize(xs_data);
         auto ys_bit_size = util::SequentialEliasFano::encodingSize(ys_data);
 
@@ -376,7 +380,9 @@ public:
         return {it.index(), x0, x1, y0, y1, y2};
     }
 
-    [[nodiscard]] size_t size() const { return EFIterator(data, ys_offset(), ys_size()).at(ys_size() - 1); }
+    [[nodiscard]] size_t size() const {
+        return EFIterator(data, ys_offset(), ys_size()).at(ys_size() - 1) + ys_size() - 1;
+    }
 
     [[nodiscard]] size_t size_in_bytes() const {
         auto bit_offset = key_bit_width + epsilon_bit_width + nsegments_bit_width + bit_offset_width;
@@ -415,8 +421,8 @@ public:
             auto x0 = *tmp1;
             auto x1 = *++tmp1;
             auto tmp2 = ys_it;
-            auto y0 = *tmp2;
-            auto y1 = *++tmp2;
+            auto y0 = *tmp2 + tmp2.index();
+            auto y1 = *++tmp2 + tmp2.index();
             auto point_index = xs_it.index();
             int64_t epsilon = storage->epsilon_value();
             auto shift1 = int64_t(storage->get_yshift(point_index * 2)) - epsilon;
@@ -461,9 +467,8 @@ private:
 
     [[nodiscard]] std::tuple<int64_t, int64_t, int64_t> get_ys(size_t point_index) const {
         EFIterator it(data, ys_offset(), ys_size());
-        int64_t y0 = it.at(point_index);
-        ++it;
-        int64_t y1 = *it;
+        int64_t y0 = it.at(point_index) + point_index;
+        int64_t y1 = *++it + point_index + 1;
         int64_t epsilon = epsilon_value();
         auto shift1 = int64_t(get_yshift(point_index * 2)) - epsilon;
         auto shift2 = int64_t(get_yshift(point_index * 2 + 1)) - epsilon;
