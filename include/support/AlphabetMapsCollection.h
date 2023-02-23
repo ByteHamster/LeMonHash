@@ -6,8 +6,20 @@ class AlphabetMapsCollection {
         std::vector<AlphabetMap<true>> maps7;
         std::vector<AlphabetMap<false>> maps8;
     public:
+        static constexpr size_t MAP_INDEX_FULL_BYTE = 1;
 
-        AlphabetMapsCollection() = default;
+        AlphabetMapsCollection() {
+            uint64_t fullAscii[] = {~0ul, ~0ul, 0ul, 0ul};
+            addOrFindSimilar(AlphabetMap<false>(fullAscii));
+            uint64_t fullByte[] = {~0ul, ~0ul, ~0ul, ~0ul};
+            addOrFindSimilar(AlphabetMap<false>(fullByte));
+            uint64_t lettersAndNumbers[] = {0xAFFFEFFF00000000, 0x17FFFFFE87FFFFFF, 0ul, 0ul};
+            addOrFindSimilar(AlphabetMap<false>(lettersAndNumbers));
+            uint64_t lowercaseLettersAndNumbers[] = {0x3FFA00100000000, 0x7FFFFFE80000000, 0ul, 0ul};
+            addOrFindSimilar(AlphabetMap<false>(lowercaseLettersAndNumbers));
+            uint64_t uppercaseLettersAndNumbers[] = {0x3FFA00100000000, 0x87FFFFFE, 0ul, 0ul};
+            addOrFindSimilar(AlphabetMap<false>(uppercaseLettersAndNumbers));
+        }
 
         uint64_t addOrFindSimilar(const AlphabetMap<false> &map) {
             if (map.isAscii()) {
