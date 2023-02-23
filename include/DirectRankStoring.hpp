@@ -34,41 +34,41 @@ class DirectRankStoringMmphf {
                 : N(data.size()),
                   bucketMapper(data.begin(), data.end()),
                   bucketSizePrefix(bucketMapper.numBuckets() + 1, data.size() + 1) {
-
-            std::vector<uint64_t> currentBucket;
-            size_t prev_bucket = 0;
+            size_t prevBucket = 0;
             size_t bucketSizePrefixTemp = 0;
+            auto currentBucketBegin = data.begin();
+            auto currentBucketEnd = data.begin();
 
             auto constructBucket = [&] {
-                size_t bucketSize = currentBucket.size();
+                size_t bucketSize = currentBucketEnd - currentBucketBegin;
                 if (bucketSize > 1) {
                     for (size_t j = 0; j < bucketSize; j++) {
-                        retrievalDataStructure.addInput(bucketSize, currentBucket.at(j), j);
+                        retrievalDataStructure.addInput(bucketSize, currentBucketBegin[j], j);
                     }
                 }
                 bucketSizePrefix.push_back(bucketSizePrefixTemp);
                 bucketSizePrefixTemp += bucketSize;
-                currentBucket.clear();
             };
 
-            bucketMapper.bucketOf(data.begin(), data.end(), [&] (auto it, auto bucket) {
-                if (it != data.begin()) {
-                    if (*it <= *std::prev(it))
+            bucketMapper.bucketOf(data.begin(), data.end(), [&] (auto it, size_t bucket) {
+                if (it != data.begin()) { [[likely]]
+                    if (*it <= *std::prev(it)) [[unlikely]]
                         throw std::invalid_argument("Data not sorted or duplicates found");
-                    if (bucket < prev_bucket)
+                    if (bucket < prevBucket) [[unlikely]]
                         throw std::runtime_error("Non-monotonic bucket mapper");
                 }
-                while (bucket != prev_bucket) {
+                while (prevBucket < bucket) {
+                    currentBucketEnd = it;
                     constructBucket();
-                    prev_bucket++;
+                    currentBucketBegin = currentBucketEnd;
+                    prevBucket++;
                 }
-                currentBucket.push_back(*it);
             });
 
-            while (prev_bucket < bucketMapper.numBuckets() + 1) {
-                constructBucket();
-                prev_bucket++;
-            }
+            currentBucketEnd = data.end();
+            constructBucket();
+            bucketSizePrefix.push_back(bucketSizePrefixTemp);
+
             bucketSizePrefix.buildRankSelect();
 
             retrievalDataStructure.build();
@@ -90,8 +90,8 @@ class DirectRankStoringMmphf {
         size_t spaceBits(bool print = true) {
             if (print) {
                 std::cout << "EliasFano:    " << (8.0 * bucketSizePrefix.space() / N) << std::endl;
-                std::cout << "BucketMapper: " << (8.0 * bucketMapper.size() / N)
-                          << " (" << bucketMapper.info() << ")" << std::endl;
+                std::cout << "BucketMapper: " << (8.0 * bucketMapper.size() / N) << " (" << bucketMapper.info() << ")" << std::endl;
+                std::cout << "Retrieval:    " << (double(retrievalDataStructure.spaceBits(0)) / N) << std::endl;
             }
             size_t bytes = bucketMapper.size() + sizeof(*this) + bucketSizePrefix.space();
             return 8 * bytes + retrievalDataStructure.spaceBits(0);
