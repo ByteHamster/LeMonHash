@@ -1,15 +1,15 @@
 [submodule "extlib/util"]
 	path = extlib/util
-	url = git@github.com:ByteHamster/Util.git
+	url = https://github.com/ByteHamster/Util.git
 [submodule "extlib/simpleRibbon"]
 	path = extlib/simpleRibbon
-	url = git@github.com:ByteHamster/SimpleRibbon.git
+	url = https://github.com/ByteHamster/SimpleRibbon.git
 [submodule "extlib/ds2i"]
 	path = extlib/ds2i
-	url = git@github.com:ByteHamster-etc/ds2i.git
+	url = https://github.com/ByteHamster-etc/ds2i.git
 [submodule "extlib/sicHash"]
 	path = extlib/sicHash
-	url = git@github.com:ByteHamster/SicHash.git
+	url = https://github.com/ByteHamster/SicHash.git
 [submodule "extlib/pthash"]
 	path = extlib/pthash
 	url = https://github.com/jermp/pthash.git
