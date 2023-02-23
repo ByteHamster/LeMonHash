@@ -67,11 +67,11 @@ struct EFPointsStorage {
     class Iterator {
         xs_type::ElementPointer xs_it;
         ys_type::ElementPointer ys_it;
-        EFPointsStorage *storage;
+        const EFPointsStorage *storage;
 
     public:
 
-        Iterator(xs_type::ElementPointer xs_it, ys_type::ElementPointer ys_it, EFPointsStorage *storage)
+        Iterator(const xs_type::ElementPointer xs_it, const ys_type::ElementPointer ys_it, const EFPointsStorage *storage)
             : xs_it(xs_it), ys_it(ys_it), storage(storage) {}
 
         std::tuple<uint64_t, uint64_t, int64_t, int64_t, int64_t> operator*() {
@@ -95,7 +95,7 @@ struct EFPointsStorage {
         }
     };
 
-    Iterator begin() { return {xs->begin(), ys->begin(), this}; }
+    Iterator begin() const { return {xs->begin(), ys->begin(), this}; }
 
 private:
 
@@ -132,7 +132,7 @@ class EFPointsStorageV2 {
     // ys in Elias-Fano representation
 
     static constexpr uint8_t key_bit_width = 64;
-    static constexpr uint8_t size_bit_width = 28;
+    static constexpr uint8_t size_bit_width = 32;
     static constexpr uint8_t epsilon_bit_width = 8;
     static constexpr uint8_t nsegments_bit_width = 24;
 
@@ -543,7 +543,7 @@ public:
     /** Execute a given function for each key in the sorted range [first, last). The function takes as the argument
      * an iterator to the current key and the corresponding approximate rank computed by the index. */
     template<typename ForwardIt, typename F>
-    void for_each(ForwardIt first, ForwardIt last, F f) {
+    void for_each(ForwardIt first, ForwardIt last, F f) const {
         size_t segment_i = 0;
         auto segment_it = points.begin();
         auto [x0, x1, y0, y1, y2] = *segment_it;
