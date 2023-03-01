@@ -1,14 +1,19 @@
 cmake_minimum_required(VERSION 3.16)
 project(DirectRankStoring)
 
-if(CMAKE_BUILD_TYPE STREQUAL "Release" AND CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+if((CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+       AND CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     add_compile_options(-march=native)
 endif()
 
 add_subdirectory(extlib/util EXCLUDE_FROM_ALL)
-add_subdirectory(extlib/sicHash EXCLUDE_FROM_ALL)
 add_subdirectory(extlib/simpleRibbon EXCLUDE_FROM_ALL)
 
+add_library(PTHash INTERFACE)
+target_compile_features(PTHash INTERFACE cxx_std_20)
+target_include_directories(PTHash INTERFACE extlib/pthash/include)
+
+option(SUCCINCT_USE_INTRINSICS "Use a set of intrinsics available on all x86-64 architectures" ON)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/extlib/ds2i/succinct/succinct_config.hpp.in
         ${CMAKE_CURRENT_SOURCE_DIR}/extlib/ds2i/succinct/succinct_config.hpp)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/extlib/ds2i/ds2i_config.hpp.in
@@ -19,7 +24,7 @@ target_include_directories(ds2i SYSTEM INTERFACE extlib/ds2i)
 add_library(DirectRankStoring INTERFACE)
 target_compile_features(DirectRankStoring INTERFACE cxx_std_20)
 target_include_directories(DirectRankStoring INTERFACE include)
-target_link_libraries(DirectRankStoring INTERFACE SimpleRibbon ByteHamsterUtil ds2i SicHash)
+target_link_libraries(DirectRankStoring INTERFACE SimpleRibbon ByteHamsterUtil ds2i PTHash)
 
 # Do not create benchmark targets when this is a subdirectory
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)

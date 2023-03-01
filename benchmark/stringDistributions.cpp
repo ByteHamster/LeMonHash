@@ -3,8 +3,6 @@
 #include <DirectRankStoring.hpp>
 #include "simpleMmphfBenchmark.hpp"
 #include <XorShift64.h>
-#include "ChunkedStringMmphf.hpp"
-#include "simpleMmphfBenchmark.hpp"
 #include "RecursiveDirectRankStoring.hpp"
 
 std::string stringOfLength(size_t length, util::XorShift64 &prng) {
@@ -42,6 +40,7 @@ std::vector<std::string> loadFile(std::string &filename, size_t maxStrings) {
     std::vector<std::string> inputData;
     inputData.reserve(maxStrings);
     std::ifstream stream(filename);
+    if (!stream) throw std::system_error(errno, std::system_category(), "failed to open " + filename);
     const int MAX_LENGTH = 524288;
     char* line = new char[MAX_LENGTH];
     while (stream.getline(line, MAX_LENGTH)) {
@@ -58,13 +57,11 @@ std::vector<std::string> loadFile(std::string &filename, size_t maxStrings) {
 }
 
 int main(int argc, char** argv) {
-    size_t N = 1e6;
+    size_t N = std::numeric_limits<size_t>::max();
     std::string filename;
-    bool chunking = false;
     tlx::CmdlineParser cmd;
     cmd.add_bytes('n', "num_keys", N, "Number of keys to generate");
     cmd.add_string('f', "filename", filename, "File with input data");
-    cmd.add_bool('c', "chunking", chunking, "Run the (inefficient, preliminary) chunking methods");
     if (!cmd.process(argc, argv)) {
         return 1;
     }
@@ -77,56 +74,15 @@ int main(int argc, char** argv) {
         std::cout<<"Loading file "<<filename<<std::endl;
         inputData = loadFile(filename, N);
     }
-
-    if (chunking) {
-        struct FullChunking {
-            static ChunkingStrategy *createLayer(size_t maxLCP, size_t layer) {
-                return new FullChunkingStrategy(maxLCP, 8);
-            }
-        };
-        simpleMmphfBenchmark<ChunkedStringMmphf<FullChunking>>(inputData);
-
-        //struct GreedyChunking {
-        //    static ChunkingStrategy *createLayer(size_t maxLCP, size_t layer) {
-        //        return new GreedyChunkingStrategy(maxLCP, 8);
-        //    }
-        //};
-        //simpleMmphfBenchmark<ChunkedStringMmphf<GreedyChunking>>(inputData); // Very slow
-
-        struct SeparateChunking {
-            static ChunkingStrategy *createLayer(size_t maxLCP, size_t layer) {
-                return new SeparateChunkingStrategy(maxLCP, 8);
-            }
-        };
-        simpleMmphfBenchmark<ChunkedStringMmphf<SeparateChunking>>(inputData);
-
-        struct LayeredChunking {
-            static ChunkingStrategy *createLayer(size_t maxLCP, size_t layer) {
-                if (layer == 0) {
-                    return new FullChunkingStrategy(maxLCP, 3); // Alphabet reduction
-                } else {
-                    return new FullChunkingStrategy(maxLCP, 8);
-                }
-            }
-        };
-        simpleMmphfBenchmark<ChunkedStringMmphf<LayeredChunking>>(inputData);
-
-        struct LayeredChunkingForUrls {
-            static ChunkingStrategy *createLayer(size_t maxLCP, size_t layer) {
-                if (layer == 0) {
-                    return new FullChunkingStrategy(maxLCP, 3); // Alphabet reduction
-                } else if (layer == 1) {
-                    return new BackChunkingStrategy(maxLCP, 8); // Make long strings shorter
-                } else {
-                    return new FullChunkingStrategy(maxLCP, 8);
-                }
-            }
-        };
-        simpleMmphfBenchmark<ChunkedStringMmphf<LayeredChunkingForUrls>>(inputData);
+    if (inputData.empty()) {
+        std::cout<<"Empty input data. Used invalid file?"<<std::endl;
+        return 1;
     }
 
-    simpleMmphfBenchmark<RecursiveDirectRankStoringMmphf>(inputData);
-    simpleMmphfBenchmark<RecursiveDirectRankStoringV2Mmphf>(inputData);
+    size_t positionOfSlash = filename.find_last_of('/');
+    std::string baseFilename = positionOfSlash == std::string::npos ? filename : filename.substr(positionOfSlash + 1);
+    simpleMmphfBenchmark<RecursiveDirectRankStoringMmphf>(inputData, baseFilename);
+    simpleMmphfBenchmark<RecursiveDirectRankStoringV2Mmphf>(inputData, baseFilename);
 
     return 0;
 }

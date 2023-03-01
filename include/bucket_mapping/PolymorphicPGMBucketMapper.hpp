@@ -1,20 +1,18 @@
 #pragma once
 
-#include "support/ShortPGM.hpp"
-#include "support/util.hpp"
-
-#pragma pack(push, 1)
+#include "support/PolymorphicPGM.hpp"
+#include <bit>
 
 /**
  * Uses a PGM-index to get an approximate rank, which we use as bucket index.
  */
-struct ShortPgmBucketMapper {
-    pgm::ShortPGMIndex<>::Holder pgm;
+struct PolymorphicPGMBucketMapper {
+    pgm::PolymorphicPGMIndex pgm;
 
-    ShortPgmBucketMapper() = default;
+    PolymorphicPGMBucketMapper() = default;
 
     template<typename RandomIt>
-    ShortPgmBucketMapper(RandomIt begin, RandomIt end) : pgm() {
+    PolymorphicPGMBucketMapper(RandomIt begin, RandomIt end) : pgm() {
         auto bestCost = std::numeric_limits<size_t>::max();
 
         size_t cost;
@@ -22,29 +20,30 @@ struct ShortPgmBucketMapper {
         RandomIt bucketBegin;
         auto updateCost = [&](auto it, size_t bucket) {
             if (bucket != previousBucket) {
-                auto bucketSize = std::distance(bucketBegin, it);
-                cost += bucketSize <= 1 ? 0 : bucketSize * BIT_WIDTH(bucketSize - 1);
+                auto bucketSize = (size_t) std::distance(bucketBegin, it);
+                cost += bucketSize <= 1 ? 0 : bucketSize * std::bit_width(bucketSize - 1);
                 previousBucket = bucket;
                 bucketBegin = it;
             }
         };
 
-        for (auto epsilon : {3, 7, 15, 31, 63}) {
-            auto p = pgm::ShortPGMIndex<>::make(begin, end, epsilon);
+        for (auto epsilon : {63, 31, 15, 7, 3}) {
+            pgm::PolymorphicPGMIndex p(begin, end, epsilon);
 
             cost = p.size_in_bytes() * 8;
+            if (cost >= bestCost) {
+                // If PGM alone already is larger, additional epsilon parameters will be larger as well.
+                break;
+            }
             previousBucket = 0;
             bucketBegin = begin;
             p.for_each(begin, end, updateCost);
-            updateCost(end, 0);
+            updateCost(end, std::numeric_limits<uint64_t>::max());
 
-            auto segmentsCount = p.segments_count();
             if (cost < bestCost) {
                 pgm = std::move(p);
                 bestCost = cost;
             }
-            if (segmentsCount == 1)
-                break;
         }
     }
 
@@ -61,14 +60,16 @@ struct ShortPgmBucketMapper {
         return pgm.size_in_bytes();
     }
 
+    [[nodiscard]] size_t segments_count() const {
+        return pgm.segments_count();
+    }
+
     [[nodiscard]] size_t numBuckets() const {
         return pgm.size();
     }
 
     static std::string name() {
-        return std::string("ShortPgmBucketMapper");
+        return std::string("PolymorphicPgmBucketMapper");
     }
 
 };
-
-#pragma pack(pop)

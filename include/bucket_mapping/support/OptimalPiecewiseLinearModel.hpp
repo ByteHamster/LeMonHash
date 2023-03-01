@@ -16,6 +16,7 @@
 #pragma once
 
 #include <algorithm>
+#include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <iterator>
@@ -314,5 +315,44 @@ size_t make_segmentation_mod(size_t n, size_t epsilon, Fin in, Fout out, bool co
     out(opt.get_segment(), p);
     return ++c;
 }
+
+}
+
+namespace pgm {
+
+struct Segment {
+    using K = uint64_t;
+    using Floating = float;
+    K key;             ///< The first key that the segment indexes.
+    Floating slope;    ///< The slope of the segment.
+    int32_t intercept; ///< The intercept of the segment.
+
+    Segment() = default;
+
+    Segment(K key, Floating slope, int32_t intercept) : key(key), slope(slope), intercept(intercept) {};
+
+    explicit Segment(size_t n) : key(std::numeric_limits<K>::max()), slope(), intercept(n) {};
+
+    explicit Segment(const typename internal::OptimalPiecewiseLinearModel<K, size_t>::CanonicalSegment &cs)
+        : key(cs.first.x) {
+        auto [cs_slope, cs_intercept] = cs.get_floating_point_segment(key);
+        if (cs_intercept > std::numeric_limits<decltype(intercept)>::max())
+            throw std::overflow_error("Change the type of Segment::intercept to int64");
+        slope = cs_slope;
+        intercept = cs_intercept;
+    }
+
+    friend inline bool operator<(const K &k, const Segment &s) { return k < s.key; }
+
+    /**
+     * Returns the approximate position of the specified key.
+     * @param k the key whose position must be approximated
+     * @return the approximate position of the specified key
+     */
+    inline size_t operator()(const K &k) const {
+        auto pos = int64_t(slope * (k - key)) + intercept;
+        return pos > 0 ? size_t(pos) : 0ull;
+    }
+};
 
 }

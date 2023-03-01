@@ -7,6 +7,26 @@
 #include <pasta/bit_vector/support/flat_rank_select.hpp>
 
 namespace util {
+
+// Returns the width of the integers stored in the low part of an Elias-Fano-coded sequence.
+//
+// This is based on:
+//
+//   Ma, Puglisi, Raman, Zhukova:
+//   On Elias-Fano for Rank Queries in FM-Indexes.
+//   DCC 2021.
+//
+// Implementation credit: Jouni Siren, https://github.com/vgteam/sdsl-lite
+static uint8_t elias_fano_lo_width(size_t universe, size_t ones) {
+    uint8_t low_width = 1;
+    // Multisets with too many ones will have width 1.
+    if (ones > 0 && ones <= universe) {
+        double ideal_width = std::log2((static_cast<double>(universe) * std::log(2.0)) / static_cast<double>(ones));
+        low_width = (uint8_t) std::round(std::max(ideal_width, 1.0));
+    }
+    return low_width;
+}
+
 /**
  * Compressed, monotone integer array.
  * Commonly used to store the positions of 1-bits in sparse bit vectors.
@@ -28,25 +48,6 @@ private:
 
     [[nodiscard]] uint64_t maskLowerBits() const { return sdsl::bits::lo_set[lowerBits()]; }
 
-    // Returns `L.width()`.
-    //
-    // This is based on:
-    //
-    //   Ma, Puglisi, Raman, Zhukova:
-    //   On Elias-Fano for Rank Queries in FM-Indexes.
-    //   DCC 2021.
-    //
-    // Implementation credit: Jouni Siren, https://github.com/vgteam/sdsl-lite
-    static uint8_t get_params(size_t universe, size_t ones) {
-        uint8_t low_width = 1;
-        // Multisets with too many ones will have width 1.
-        if (ones > 0 && ones <= universe) {
-            double ideal_width = std::log2((static_cast<double>(universe) * std::log(2.0)) / static_cast<double>(ones));
-            low_width = (uint8_t) std::round(std::max(ideal_width, 1.0));
-        }
-        return low_width;
-    }
-
 public:
 
     /**
@@ -66,7 +67,7 @@ public:
             assert(fano.H[positionH] == 1);
         }
 
-        ElementPointer& operator++() {
+        ElementPointer &operator++() {
             if (positionL >= fano->count - 1) {
                 // Incremented more than the number of elements in the sequence.
                 // Dereferencing it now is undefined behavior but decrementing again makes it usable again.
@@ -84,7 +85,7 @@ public:
             return *this;
         }
 
-        ElementPointer& operator--() {
+        ElementPointer &operator--() {
             if (positionL >= fano->count) {
                 // Was incremented more than the number of elements in the sequence.
                 // Will be dereferenceable again if decremented to be inside the bounds.
@@ -103,16 +104,16 @@ public:
             return *this;
         }
 
-        uint64_t operator *() const {
+        uint64_t operator*() const {
             assert(positionL < fano->count);
             if (fano->lowerBits() == 0) {
                 return h;
             }
-            uint64_t l = static_cast<ConstIntVector&>(fano->L)[positionL];
+            uint64_t l = static_cast<ConstIntVector &>(fano->L)[positionL];
             return (h << fano->lowerBits()) + l;
         }
 
-        size_t operator -(const ElementPointer &pointer) const {
+        size_t operator-(const ElementPointer &pointer) const {
             return index() - pointer.index();
         }
 
@@ -126,7 +127,7 @@ public:
     }
 
     EliasFanoM(size_t num, uint64_t universeSize)
-        : L(get_params(universeSize, num) == 0 ? 0 : num, 0, get_params(universeSize, num)),
+        : L(elias_fano_lo_width(universeSize, num) == 0 ? 0 : num, 0, elias_fano_lo_width(universeSize, num)),
           H((universeSize >> lowerBits()) + num + 1, false),
           universeSize(universeSize) {
     }
@@ -140,7 +141,7 @@ public:
         assert(element < universeSize);
         uint64_t l = element & maskLowerBits();
         uint64_t h = element >> lowerBits();
-        assert(element == h*(1l << lowerBits()) + l);
+        assert(element == h * (1l << lowerBits()) + l);
         if (lowerBits() != 0) {
             L[index] = l;
         }
@@ -195,7 +196,7 @@ public:
         } else if (lowerBits() != 0) {
             // Look through elements with the same upper bits
             while (true) {
-                const uint64_t lower = static_cast<ConstIntVector&>(L)[positionL];
+                const uint64_t lower = static_cast<ConstIntVector &>(L)[positionL];
                 if (lower > elementL) {
                     // Return previous item
                     if (positionL > 0) {
@@ -278,12 +279,136 @@ public:
      * Space usage of this data structure, in bytes.
      */
     [[nodiscard]] size_t space() const {
-        return L.capacity()/8 + H.size()/8 + selectStructureOverhead() + sizeof(*this);
+        return L.capacity() / 8 + H.size() / 8 + selectStructureOverhead() + sizeof(*this);
     }
 
     [[nodiscard]] int selectStructureOverhead() const {
         return rankSelect->space_usage();
     }
+};
+
+/**
+ * Elias-Fano implementation without efficient rank/select.
+ */
+struct SequentialEliasFano {
+    static constexpr uint8_t bit_size_bits = 6;
+
+    /** Returns the bit-width of the low part of an Elias-Fano encoding of the given elements, and the bit offsets to
+     * the end of the various components of the encoding: metadata, low part, high part. */
+    static std::tuple<uint8_t, size_t, size_t, size_t> encodingOffsets(const std::vector<uint64_t> &elements) {
+        auto u = elements.back() + 1;
+        auto n = elements.size();
+        auto l = elias_fano_lo_width(u, n);
+        auto metadata = bit_size_bits;
+        auto loBits = l * n;
+        auto hiBits = (u >> l) + n + 1;
+        return {l, metadata, metadata + loBits, metadata + loBits + hiBits};
+    }
+
+    /** Returns the number of bits needed to encode the given elements. */
+    static size_t encodingSize(const std::vector<uint64_t> &elements) { return std::get<3>(encodingOffsets(elements)); }
+
+    /** Encodes the given elements into the given data array, starting at the given bit offset. The area between
+     * offset and offset + encodingSize(elements) must be already zeroed. */
+    static void write(uint64_t *data, size_t offset, const std::vector<uint64_t> &elements) {
+        auto [l, metadataEnd, loEnd, hiEnd] = encodingOffsets(elements);
+        auto loMask = (uint64_t(1) << l) - 1;
+
+        auto wordPtr = data + offset / 64;
+        auto wordOffset = uint8_t(offset % 64);
+        sdsl::bits::write_int_and_move(wordPtr, l, wordOffset, bit_size_bits);
+
+        for (size_t i = 0; i < elements.size(); i++) {
+            if (l > 0)
+                sdsl::bits::write_int_and_move(wordPtr, elements[i] & loMask, wordOffset, l);
+            auto hiBitPos = offset + loEnd + (elements[i] >> l) + i;
+            data[hiBitPos / 64] |= uint64_t(1) << (hiBitPos % 64);
+        }
+    }
+
+    class Iterator {
+        const uint64_t *data; ///< Pointer to the data array.
+        uint8_t l;            ///< Number of bits used for each integer stored in the low part.
+        size_t metadataEnd;   ///< Bit offset of the end of the metadata (i.e. start of the low part).
+        size_t loEnd;         ///< Bit offset of the end of the low part (i.e. start of the high part).
+        size_t n;             ///< Number of elements.
+        size_t rank;          ///< Rank/position of element in [0, n) currently pointed by the iterator.
+        size_t hiPos;         ///< loEnd + position in the high part of the element currently pointed by the iterator.
+
+    public:
+
+        Iterator(const uint64_t *data, size_t offset, size_t n) : data(data), n(n) {
+            auto wordPtr = data + offset / 64;
+            auto wordOffset = uint8_t(offset % 64);
+            l = sdsl::bits::read_int_and_move(wordPtr, wordOffset, bit_size_bits);
+            metadataEnd = offset + bit_size_bits;
+            loEnd = offset + bit_size_bits + l * n;
+            reset();
+        }
+
+        /** Returns the element pointed by the iterator. */
+        uint64_t operator*() {
+            auto loBitPos = metadataEnd + rank * l;
+            auto lo = sdsl::bits::read_int(data + loBitPos / 64, loBitPos % 64, l);
+            return (hiPos - loEnd - rank) << l | lo;
+        }
+
+        /** Advances the iterator to the next element. */
+        Iterator &operator++() {
+            ++rank;
+            nextHi();
+            return *this;
+        }
+
+        /** Moves the iterator to the previous element. */
+        void operator--() {
+            --rank;
+            prevHi();
+        }
+
+        /** Returns the position of the element pointed by the iterator. */
+        [[nodiscard]] size_t index() const { return rank; }
+
+        /** Returns the element at the given position. */
+        uint64_t at(size_t pos) {
+            reset();
+            for (; rank < pos; ++rank)
+                nextHi();
+            return **this;
+        }
+
+        /** Returns the number of elements in the sequence. */
+        [[nodiscard]] size_t size() const { return n; }
+
+    private:
+
+        /** Initializes the iterator to the first element. */
+        void reset() {
+            rank = 0;
+            hiPos = loEnd;
+            if ((data[hiPos / 64] & uint64_t(1) << (hiPos % 64)) == 0)
+                nextHi();
+        }
+
+        /** Moves hiPos to the next set bit in the high part */
+        void nextHi() {
+            auto wordIdx = hiPos / 64;
+            uint64_t word = data[wordIdx] & uint64_t(-1) << (hiPos % 64);
+            word &= word - 1;
+            while (word == 0)
+                word = data[++wordIdx];
+            hiPos = wordIdx * 64 + __builtin_ctzll(word);
+        }
+
+        /** Moves hiPos to the previous set bit in the high part */
+        void prevHi() {
+            auto wordIdx = hiPos / 64;
+            uint64_t word = data[wordIdx] & ((uint64_t(1) << hiPos % 64) - 1);
+            while (word == 0)
+                word = data[--wordIdx];
+            hiPos = wordIdx * 64 + 63 - __builtin_clzll(word);
+        }
+    };
 };
 
 } // Namespace util

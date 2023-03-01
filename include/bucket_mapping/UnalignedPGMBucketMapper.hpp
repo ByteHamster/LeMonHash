@@ -1,18 +1,17 @@
 #pragma once
 
 #include "support/UnalignedPGM.hpp"
-#include "support/util.hpp"
 
 /**
  * Uses a PGM-index to get an approximate rank, which we use as bucket index.
  */
-struct UnalignedPgmBucketMapper {
+struct UnalignedPGMBucketMapper {
     pgm::UnalignedPGMIndex pgm;
 
-    UnalignedPgmBucketMapper() = default;
+    UnalignedPGMBucketMapper() = default;
 
     template<typename RandomIt>
-    UnalignedPgmBucketMapper(RandomIt begin, RandomIt end) : pgm() {
+    UnalignedPGMBucketMapper(RandomIt begin, RandomIt end) : pgm() {
         auto bestCost = std::numeric_limits<size_t>::max();
 
         size_t cost;
@@ -20,29 +19,30 @@ struct UnalignedPgmBucketMapper {
         RandomIt bucketBegin;
         auto updateCost = [&](auto it, size_t bucket) {
             if (bucket != previousBucket) {
-                auto bucketSize = std::distance(bucketBegin, it);
-                cost += bucketSize <= 1 ? 0 : bucketSize * BIT_WIDTH(bucketSize - 1);
+                auto bucketSize = (size_t) std::distance(bucketBegin, it);
+                cost += bucketSize <= 1 ? 0 : bucketSize * std::bit_width(bucketSize - 1);
                 previousBucket = bucket;
                 bucketBegin = it;
             }
         };
 
-        for (auto epsilon : {3, 7, 15, 31, 63}) {
+        for (auto epsilon : {63, 31, 15, 7, 3}) {
             pgm::UnalignedPGMIndex p(begin, end, epsilon);
 
             cost = p.size_in_bytes() * 8;
+            if (cost >= bestCost) {
+                // If PGM alone already is larger, additional epsilon parameters will be larger as well.
+                break;
+            }
             previousBucket = 0;
             bucketBegin = begin;
             p.for_each(begin, end, updateCost);
             updateCost(end, std::numeric_limits<uint64_t>::max());
 
-            auto segmentsCount = p.segments_count();
             if (cost < bestCost) {
                 pgm = std::move(p);
                 bestCost = cost;
             }
-            if (segmentsCount == 1)
-                break;
         }
     }
 
@@ -57,6 +57,10 @@ struct UnalignedPgmBucketMapper {
 
     [[nodiscard]] size_t size() const {
         return pgm.size_in_bytes();
+    }
+
+    [[nodiscard]] size_t segments_count() const {
+        return pgm.segments_count();
     }
 
     [[nodiscard]] size_t numBuckets() const {

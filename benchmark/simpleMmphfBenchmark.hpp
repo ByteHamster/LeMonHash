@@ -8,7 +8,7 @@
 #include <malloc.h>
 
 template <typename MMphf, typename key_t>
-void simpleMmphfBenchmark(std::vector<key_t> &inputData) {
+void simpleMmphfBenchmark(std::vector<key_t> &inputData, std::string &dataset) {
     std::cout<<"\r\033[K"<<"Generating "<<MMphf::name()<<std::flush;
 
     size_t spaceBefore = mallinfo2().uordblks;
@@ -41,6 +41,7 @@ void simpleMmphfBenchmark(std::vector<key_t> &inputData) {
 
     // This format can be converted to TikZ/PGF plots using https://github.com/bingmann/sqlplot-tools
     std::cout << "RESULT"
+              << " dataset=" << dataset
               << " competitor=" << MMphf::name()
               << " N=" << N
               << " numQueries=" << numQueries
