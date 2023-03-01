@@ -133,8 +133,7 @@ class RecursiveDirectRankStoringMmphf {
             if (N == 0) return;
             {
                 auto lcps = computeLCPs(strings.begin(), strings.end());
-                constructNode(strings.begin(), strings.end(), lcps.begin(), 0, TreePath(), 0,
-                              AlphabetMapsCollection::MAP_INDEX_FULL_BYTE);
+                constructNode(strings.begin(), strings.end(), lcps.begin(), 0, TreePath(), 0, 0);
             }
             retrieval.build();
 
@@ -191,7 +190,7 @@ class RecursiveDirectRankStoringMmphf {
 
             if (!alphabetMaps.isFullForBits(LOG2_ALPHABET_MAPS_COUNT) && nThisNode > ALPHABET_MAPS_THRESHOLD) {
                 AlphabetMap am(lcpsBegin, nThisNode);
-                if (am.length64() == alphabetMaps.length64(ancestorAlphabetMapIndex)) {
+                if (!alphabetMaps.empty() && am.length64() == alphabetMaps.length64(ancestorAlphabetMapIndex)) {
                     treeNode.alphabetMapIndex = ancestorAlphabetMapIndex;
                 } else {
                     treeNode.alphabetMapIndex = alphabetMaps.addOrFindSimilar(am);
@@ -574,8 +573,7 @@ class RecursiveDirectRankStoringV2Mmphf {
             N = strings.size();
             {
                 auto lcps = computeLCPs(strings.begin(), strings.end());
-                constructNode(strings.begin(), strings.end(), lcps.begin(), 0, 0, TreePath(), 0,
-                              AlphabetMapsCollection::MAP_INDEX_FULL_BYTE);
+                constructNode(strings.begin(), strings.end(), lcps.begin(), 0, 0, TreePath(), 0, 0);
             }
             retrieval.build();
 
@@ -629,7 +627,7 @@ class RecursiveDirectRankStoringV2Mmphf {
 
             if (!alphabetMaps.isFullForBits(LOG2_ALPHABET_MAPS_COUNT) && nThisNode > ALPHABET_MAPS_THRESHOLD) {
                 AlphabetMap am(lcpsBegin, nThisNode);
-                if (am.length64() == alphabetMaps.length64(ancestorAlphabetMapIndex)) {
+                if (!alphabetMaps.empty() && am.length64() == alphabetMaps.length64(ancestorAlphabetMapIndex)) {
                     treeNode.alphabetMapIndex = ancestorAlphabetMapIndex;
                 } else {
                     treeNode.alphabetMapIndex = alphabetMaps.addOrFindSimilar(am);
