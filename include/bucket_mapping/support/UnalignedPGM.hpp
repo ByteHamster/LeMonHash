@@ -312,6 +312,25 @@ public:
         auto [_, key_bits, size_bits, intercept_bits, _1, n_segments, _2] = metadata();
         return sizeof(*this) + words_needed(key_bits, size_bits, intercept_bits, n_segments) * sizeof(uint64_t);
     }
+
+    void copyTo(char *ptr) {
+        if (one_segment) {
+            *((uint64_t *) ptr) = raw_ptr;
+        } else {
+            auto [_, key_bits, size_bits, intercept_bits, _1, n_segments, _2] = metadata();
+            memcpy(ptr, (void *)raw_ptr, words_needed(key_bits, size_bits, intercept_bits, n_segments) * sizeof(uint64_t));
+        }
+    }
+
+    UnalignedPGMIndex(const char *ptr, size_t size) {
+        if (size == sizeof(uint64_t)) {
+            one_segment = true;
+            raw_ptr = *((uint64_t *) ptr);
+        } else {
+            raw_ptr = reinterpret_cast<uint64_t>(ptr) >> 1;
+            one_segment = false;
+        }
+    }
 };
 
 }

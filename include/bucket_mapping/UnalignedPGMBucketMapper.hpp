@@ -71,4 +71,11 @@ struct UnalignedPGMBucketMapper {
         return std::string("UnalignedPgmBucketMapper");
     }
 
+    UnalignedPGMBucketMapper(const char *ptr, size_t size) {
+        pgm = pgm::UnalignedPGMIndex(ptr, size);
+    }
+
+    void copyTo(char *ptr) {
+        pgm.copyTo(ptr);
+    }
 };
