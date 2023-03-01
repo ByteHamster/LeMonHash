@@ -206,12 +206,13 @@ class RecursiveDirectRankStoringMmphf {
                     if (((rand() + time(nullptr)) % 300) == 0 && chunks.size() < 1000) { // Some random bucket
                         static int bucketsPrinted = 0;
                         std::cout<<"Segments: "<<mapper.pgm.segments_count()<<std::endl;
-                        uint64_t min = chunks.front();
+                        double rangeCompression = (double) chunks.size() / mapper.pgm.size();
+                        uint64_t min = chunks.at(1);
                         uint64_t max = chunks.back();
-                        for (size_t i = 0; i < chunks.size(); i++) {
-                            std::cout<<"RESULT print="<<bucketsPrinted<<" type=chunk value="<<chunks.at(i)<<" rank="<<i<<std::endl;
+                        for (size_t i = 1; i < chunks.size(); i++) {
+                            std::cout<<"RESULT print="<<bucketsPrinted<<" type=chunk value="<<chunks.at(i)<<" rank="<<(double)i/rangeCompression<<std::endl;
                         }
-                        for (size_t i = 0; i < chunks.size(); i++) {
+                        for (size_t i = 1; i < chunks.size(); i++) {
                             std::cout<<"RESULT print="<<bucketsPrinted<<" type=bucketReceivedKeys value="<<0.97*min<<" rank="<<mapper.bucketOf(chunks.at(i))<<std::endl;
                         }
                         for (size_t i = min; i < max; i += (max-min)/100) {
