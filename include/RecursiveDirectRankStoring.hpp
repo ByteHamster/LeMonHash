@@ -60,9 +60,9 @@ class RecursiveDirectRankStoringMmphf {
         static constexpr size_t LOG2_ALPHABET_MAPS_COUNT = 18;
 
         struct TreeNode {
-            static constexpr bool useIndirection = sizeof(BucketMapperType) > 8;
+            static constexpr bool useIndirection = true;
 
-            std::conditional_t<useIndirection, BucketMapperType *, BucketMapperType> bucketMapper;
+            std::conditional_t<useIndirection, BucketMapperType *, BucketMapperType> bucketMapper = nullptr;
             uint32_t offsetsOffset = 0;
             uint16_t alphabetMapIndex;
             uint16_t minLCP;
@@ -104,7 +104,7 @@ class RecursiveDirectRankStoringMmphf {
                     directRankStoring = true;
                 } else {
                     directRankStoring = false;
-                    bucketMapper = BucketMapperType(ptr, length - 3 * sizeof(uint16_t) + sizeof(uint32_t));
+                    bucketMapper = new BucketMapperType(ptr, length - 3 * sizeof(uint16_t) + sizeof(uint32_t));
                 }
             }
 
@@ -132,7 +132,7 @@ class RecursiveDirectRankStoringMmphf {
                 ptr += sizeof(uint32_t);
 
                 if (!directRankStoring) {
-                    bucketMapper.copyTo(ptr);
+                    bucketMapper->copyTo(ptr);
                 }
                 return rawSpaceUsage();
             }
@@ -480,7 +480,9 @@ class RecursiveDirectRankStoringMmphf {
                     layer++;
                     path = path.getChild(bucket);
                     treeNodeIndex = treeNodesMphf(path.currentNodeHash());
-                    std::construct_at(&node, treeNodeData + treeNodeDataOffsets.at(treeNodeIndex), treeNodeDataOffsets.at(treeNodeIndex + 1));
+                    size_t nodeRawPtrOffset = treeNodeDataOffsets.at(treeNodeIndex);
+                    size_t nextNodeRawPtrOffset = treeNodeDataOffsets.at(treeNodeIndex + 1);
+                    std::construct_at(&node, treeNodeData + nodeRawPtrOffset, nextNodeRawPtrOffset - nodeRawPtrOffset);
                 }
             }
         }

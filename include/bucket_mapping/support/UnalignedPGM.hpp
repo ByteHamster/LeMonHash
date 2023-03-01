@@ -36,6 +36,7 @@ class UnalignedPGMIndex {
 
     bool one_segment : 1;
     uint64_t raw_ptr : 63;
+    bool createdFromRawPtr = false;
 
     // if !one_segment, then raw_ptr << 1 points to a memory area containing:
     //   first_key in first_key_bits
@@ -53,7 +54,7 @@ class UnalignedPGMIndex {
     }
 
     void free_data() {
-        if (!one_segment)
+        if (!one_segment && !createdFromRawPtr)
             operator delete[] (data(), align_val);
     }
 
@@ -318,11 +319,12 @@ public:
             *((uint64_t *) ptr) = raw_ptr;
         } else {
             auto [_, key_bits, size_bits, intercept_bits, _1, n_segments, _2] = metadata();
-            memcpy(ptr, (void *)raw_ptr, words_needed(key_bits, size_bits, intercept_bits, n_segments) * sizeof(uint64_t));
+            memcpy(ptr, (void *)data(), words_needed(key_bits, size_bits, intercept_bits, n_segments) * sizeof(uint64_t));
         }
     }
 
     UnalignedPGMIndex(const char *ptr, size_t size) {
+        createdFromRawPtr = true;
         if (size == sizeof(uint64_t)) {
             one_segment = true;
             raw_ptr = *((uint64_t *) ptr);
