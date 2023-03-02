@@ -215,7 +215,18 @@ class RecursiveDirectRankStoringMmphf {
                 for (size_t i = 0; i < treeNodesInput.size(); i++) {
                     treeNodeDataOffsets->push_back(position);
                     TreeNode &node = treeNodesInput.at(reverseMPHF.at(i)).second;
-                    position += node.copyTo(treeNodeData + position);
+                    size_t size = node.copyTo(treeNodeData + position);
+#ifndef NODEBUG
+                    TreeNode test(treeNodeData + position, size);
+                    assert(test.alphabetMapIndex == node.alphabetMapIndex);
+                    assert(test.minLCP == node.minLCP);
+                    assert(test.offsetsOffset == node.offsetsOffset);
+                    assert(test.strategy == node.strategy);
+                    if (test.strategy == BucketStrategy::MAPPER) {
+                        assert(test.bucketMapper->pgm.size_in_bytes() == node.bucketMapper->pgm.size_in_bytes());
+                    }
+#endif
+                    position += size;
                     assert(position <= treeNodeRawSize);
                 }
                 treeNodeDataOffsets->push_back(position);
