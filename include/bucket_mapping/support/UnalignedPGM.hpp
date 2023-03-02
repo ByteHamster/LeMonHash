@@ -323,8 +323,7 @@ public:
         if (one_segment) {
             *((uint64_t *) ptr) = raw_ptr;
         } else {
-            auto [_, key_bits, size_bits, intercept_bits, _1, n_segments, _2] = metadata();
-            memcpy(ptr, (void *)data(), words_needed(key_bits, size_bits, intercept_bits, n_segments) * sizeof(uint64_t));
+            memcpy(ptr, (void *)data(), size_in_bytes());
         }
     }
 
