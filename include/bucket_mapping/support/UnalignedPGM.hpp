@@ -309,9 +309,9 @@ public:
     /**  Returns the size of the index in bytes. */
     [[nodiscard]] size_t size_in_bytes() const {
         if (one_segment)
-            return sizeof(*this);
+            return sizeof(uint64_t);
         auto [_, key_bits, size_bits, intercept_bits, _1, n_segments, _2] = metadata();
-        return sizeof(*this) + words_needed(key_bits, size_bits, intercept_bits, n_segments) * sizeof(uint64_t);
+        return words_needed(key_bits, size_bits, intercept_bits, n_segments) * sizeof(uint64_t);
     }
 
     void copyTo(char *ptr) {

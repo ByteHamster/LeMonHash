@@ -104,7 +104,7 @@ class RecursiveDirectRankStoringMmphf {
                     directRankStoring = true;
                 } else {
                     directRankStoring = false;
-                    bucketMapper = new BucketMapperType(ptr, length - 3 * sizeof(uint16_t) + sizeof(uint32_t));
+                    bucketMapper = new BucketMapperType(ptr, length - (2 * sizeof(uint16_t) + 2 * sizeof(uint32_t)));
                 }
             }
 
@@ -117,7 +117,7 @@ class RecursiveDirectRankStoringMmphf {
                 if (directRankStoring) {
                     return 2 * sizeof(uint16_t) + 2 * sizeof(uint32_t);
                 } else {
-                    return 3 * sizeof(uint16_t) + 2 * sizeof(uint32_t) + getBucketMapper().size();
+                    return 2 * sizeof(uint16_t) + 2 * sizeof(uint32_t) + getBucketMapper().size();
                 }
             }
 
@@ -217,6 +217,10 @@ class RecursiveDirectRankStoringMmphf {
                     assert(test.minLCP == node.minLCP);
                     assert(test.offsetsOffset == node.offsetsOffset);
                     assert(test.directRankStoring == node.directRankStoring);
+                    if (!node.directRankStoring) {
+                        assert(test.bucketMapper->numBuckets() == node.bucketMapper->numBuckets());
+                        assert(test.bucketMapper->segments_count() == node.bucketMapper->segments_count());
+                    }
 #endif
                     position += size;
                     assert(position <= treeNodeRawSize);
@@ -237,7 +241,7 @@ class RecursiveDirectRankStoringMmphf {
 
             if (bucketOffsets.size() <= layer)
                 bucketOffsets.resize(layer + 1);
-            if (bucketOffsets.at(layer).size() + 1 > std::numeric_limits<uint16_t>::max())
+            if (bucketOffsets.at(layer).size() + 1 > std::numeric_limits<uint32_t>::max())
                 throw std::runtime_error("Increase offsetsOffsetBits");
 
             TreeNode treeNode;
