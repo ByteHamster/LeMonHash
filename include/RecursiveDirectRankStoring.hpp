@@ -59,6 +59,10 @@ class RecursiveDirectRankStoringMmphf {
 
         static constexpr size_t LOG2_ALPHABET_MAPS_COUNT = 18;
 
+        enum BucketStrategy {
+            CHUNK_DRS, MAPPER
+        };
+
         struct TreeNode {
             static constexpr bool useIndirection = true;
 
@@ -67,7 +71,7 @@ class RecursiveDirectRankStoringMmphf {
             uint16_t alphabetMapIndex;
             uint16_t minLCP;
 
-            bool directRankStoring = false;
+            BucketStrategy strategy = BucketStrategy::CHUNK_DRS;
             uint32_t numChildren = 0;
             bool createdFromRawPtr = false;
 
@@ -77,15 +81,15 @@ class RecursiveDirectRankStoringMmphf {
                 offsetsOffset = other.offsetsOffset;
                 minLCP = other.minLCP;
                 alphabetMapIndex = other.alphabetMapIndex;
-                directRankStoring = other.directRankStoring;
-                if (!directRankStoring)
+                strategy = other.strategy;
+                if (strategy == BucketStrategy::MAPPER)
                     bucketMapper = std::move(other.bucketMapper);
                 numChildren = other.numChildren;
                 createdFromRawPtr = other.createdFromRawPtr;
                 other.offsetsOffset = 0;
                 other.minLCP = ((1 << 15) - 1);
                 other.alphabetMapIndex = 0;
-                other.directRankStoring = false;
+                other.strategy = BucketStrategy::CHUNK_DRS;
                 other.bucketMapper = {};
             }
 
@@ -101,20 +105,20 @@ class RecursiveDirectRankStoringMmphf {
                 ptr += sizeof(uint32_t);
 
                 if (length == 2 * sizeof(uint16_t) + 2 * sizeof(uint32_t)) {
-                    directRankStoring = true;
+                    strategy = CHUNK_DRS;
                 } else {
-                    directRankStoring = false;
+                    strategy = MAPPER;
                     bucketMapper = new BucketMapperType(ptr, length - (2 * sizeof(uint16_t) + 2 * sizeof(uint32_t)));
                 }
             }
 
             const BucketMapperType &getBucketMapper() const {
-                assert(!directRankStoring);
+                assert(strategy == MAPPER);
                 return maybe_deref(bucketMapper);
             }
 
             size_t rawSpaceUsage() const {
-                if (directRankStoring) {
+                if (strategy == CHUNK_DRS) {
                     return 2 * sizeof(uint16_t) + 2 * sizeof(uint32_t);
                 } else {
                     return 2 * sizeof(uint16_t) + 2 * sizeof(uint32_t) + getBucketMapper().size();
@@ -131,7 +135,7 @@ class RecursiveDirectRankStoringMmphf {
                 *((uint32_t*) ptr) = offsetsOffset;
                 ptr += sizeof(uint32_t);
 
-                if (!directRankStoring) {
+                if (strategy == MAPPER) {
                     bucketMapper->copyTo(ptr);
                 }
                 return rawSpaceUsage();
@@ -144,7 +148,7 @@ class RecursiveDirectRankStoringMmphf {
             }
 
             void destroyBucketMapper() {
-                if (!directRankStoring && !createdFromRawPtr)
+                if (strategy == MAPPER && !createdFromRawPtr)
                     maybe_delete(bucketMapper);
             }
 
@@ -253,41 +257,46 @@ class RecursiveDirectRankStoringMmphf {
             auto [chunks, chunksOffsets] = extractChunks(begin, end, lcpsBegin, treeNode);
             assert(chunks.size() >= 2); // If all were the same, we would have not cut off enough
 
-            auto tryPgmMapper = chunks.size() > CHUNK_DIRECT_RANK_STORING_THRESHOLD;
-            if (tryPgmMapper) {
+            if (chunks.size() <= CHUNK_DIRECT_RANK_STORING_THRESHOLD) {
+                treeNode.strategy = BucketStrategy::CHUNK_DRS;
+            } else {
+                treeNode.strategy = BucketStrategy::MAPPER;
                 treeNode.buildBucketMapper(chunks.begin(), chunks.end());
                 auto &mapper = treeNode.getBucketMapper();
                 if (mapper.bucketOf(chunks.front()) == mapper.bucketOf(chunks.back())) {
-                    treeNode.destroyBucketMapper();
-                    tryPgmMapper = false;
-                } else {
-                    assert(treeNode.getBucketMapper().numBuckets() >= 2);
-                    auto currentBucketBegin = begin;
-                    auto currentBucketEnd = begin;
-                    size_t prevBucket = 0;
-                    size_t bucketSizePrefixTemp = 0;
+                    // Endless loop: Mapper needs at least 2 different buckets
+                    treeNode.strategy = BucketStrategy::CHUNK_DRS;
+                }
 
-                    mapper.bucketOf(chunks.begin(), chunks.end(), [&](auto chunks_it, size_t bucket) {
-                        currentBucketEnd = begin + chunksOffsets.at(chunks_it - chunks.begin());
-                        while (prevBucket < bucket) {
-                            constructChild(currentBucketBegin, currentBucketEnd,
-                                           lcpsBegin + (currentBucketBegin - begin), offset + bucketSizePrefixTemp,
-                                           path, prevBucket, layer, treeNode.alphabetMapIndex);
-                            bucketSizePrefixTemp += std::distance(currentBucketBegin, currentBucketEnd);
-                            currentBucketBegin = currentBucketEnd;
-                            prevBucket++;
-                        }
-                    });
-                    if (currentBucketBegin != end) {
-                        constructChild(currentBucketBegin, end, lcpsBegin + (currentBucketBegin - begin),
-                                       offset + bucketSizePrefixTemp, path, prevBucket, layer,
-                                       treeNode.alphabetMapIndex);
-                    }
+                if (treeNode.strategy != BucketStrategy::MAPPER) {
+                    treeNode.destroyBucketMapper();
                 }
             }
 
-            if (!tryPgmMapper) {
-                treeNode.directRankStoring = true;
+            if (treeNode.strategy == BucketStrategy::MAPPER) {
+                assert(treeNode.getBucketMapper().numBuckets() >= 2);
+                auto currentBucketBegin = begin;
+                auto currentBucketEnd = begin;
+                size_t prevBucket = 0;
+                size_t bucketSizePrefixTemp = 0;
+
+                treeNode.getBucketMapper().bucketOf(chunks.begin(), chunks.end(), [&](auto chunks_it, size_t bucket) {
+                    currentBucketEnd = begin + chunksOffsets.at(chunks_it - chunks.begin());
+                    while (prevBucket < bucket) {
+                        constructChild(currentBucketBegin, currentBucketEnd,
+                                       lcpsBegin + (currentBucketBegin - begin), offset + bucketSizePrefixTemp,
+                                       path, prevBucket, layer, treeNode.alphabetMapIndex);
+                        bucketSizePrefixTemp += std::distance(currentBucketBegin, currentBucketEnd);
+                        currentBucketBegin = currentBucketEnd;
+                        prevBucket++;
+                    }
+                });
+                if (currentBucketBegin != end) {
+                    constructChild(currentBucketBegin, end, lcpsBegin + (currentBucketBegin - begin),
+                                   offset + bucketSizePrefixTemp, path, prevBucket, layer,
+                                   treeNode.alphabetMapIndex);
+                }
+            } else if (treeNode.strategy == BucketStrategy::CHUNK_DRS) {
                 treeNode.numChildren = chunks.size();
 
                 auto currentBucketEnd = begin;
@@ -302,6 +311,8 @@ class RecursiveDirectRankStoringMmphf {
                                    offset + bucketSizePrefixTemp, path, chunk, layer, treeNode.alphabetMapIndex);
                     bucketSizePrefixTemp += std::distance(currentBucketBegin, currentBucketEnd);
                 }
+            } else {
+                throw std::runtime_error("Unknown strategy");
             }
 
             bucketOffsets.at(layer).append(offset + nThisNode);
@@ -359,18 +370,21 @@ class RecursiveDirectRankStoringMmphf {
             if (currentBucketSize <= 1) {
                 // Nothing to do
             } else if (currentBucketSize < DIRECT_RANK_STORING_THRESHOLD) {
-                // Perform direct rank storing
-                uint32_t indexInBucket = 0;
-                auto it = begin;
-                while (it != end) {
-                    retrieval.addInput(currentBucketSize, util::MurmurHash64(*it), indexInBucket);
-                    it++;
-                    indexInBucket++;
-                }
+                performDirectRankStoring(begin, end, currentBucketSize);
             } else {
                 // Recurse
                 constructNode(begin, end, lcpsBegin, offset, path.getChild(bucket), layer + 1,
                               ancestorAlphabetMapIndex);
+            }
+        }
+
+        void performDirectRankStoring(auto begin, auto end, size_t currentBucketSize) {
+            uint32_t indexInBucket = 0;
+            auto it = begin;
+            while (it != end) {
+                retrieval.addInput(currentBucketSize, util::MurmurHash64(*it), indexInBucket);
+                it++;
+                indexInBucket++;
             }
         }
 
@@ -455,7 +469,7 @@ class RecursiveDirectRankStoringMmphf {
             while (true) {
                 uint64_t chunk = extractChunk(string, node);
                 size_t bucket;
-                if (node.directRankStoring) {
+                if (node.strategy == BucketStrategy::CHUNK_DRS) {
                     uint64_t key = path.getChild(chunk).alternativeHash();
                     bucket = retrieval.query(node.numChildren, key);
                 } else {
