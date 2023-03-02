@@ -156,7 +156,7 @@ class RecursiveDirectRankStoringMmphf {
         std::vector<std::pair<uint64_t, TreeNode>> treeNodesInput;
         char *treeNodeData = nullptr;
         size_t treeNodeRawSize = 0;
-        std::vector<size_t> treeNodeDataOffsets;
+        util::EliasFanoM *treeNodeDataOffsets = nullptr;
         using Mphf = pthash::single_phf<pthash::murmurhash2_64, pthash::compact_compact, true>;
         Mphf treeNodesMphf;
         std::vector<DuplicateFilterRank<PartitionedEliasFano>> bucketOffsets;
@@ -180,11 +180,12 @@ class RecursiveDirectRankStoringMmphf {
                 treeNodeRawSize += node.second.rawSpaceUsage();
             }
             treeNodeData = static_cast<char *>(malloc(treeNodeRawSize));
+            treeNodeDataOffsets = new util::EliasFanoM(treeNodesInput.size() + 1, treeNodeRawSize + 1);
 
             if (treeNodesInput.size() == 1) {
-                treeNodeDataOffsets.push_back(0);
+                treeNodeDataOffsets->push_back(0);
                 size_t size = treeNodesInput.front().second.copyTo(treeNodeData);
-                treeNodeDataOffsets.push_back(size);
+                treeNodeDataOffsets->push_back(size);
                 assert(size <= treeNodeRawSize);
             } else {
                 std::vector<uint64_t> mphfInput;
@@ -208,27 +209,16 @@ class RecursiveDirectRankStoringMmphf {
                 }
                 size_t position = 0;
                 for (size_t i = 0; i < treeNodesInput.size(); i++) {
-                    treeNodeDataOffsets.push_back(position);
+                    treeNodeDataOffsets->push_back(position);
                     TreeNode &node = treeNodesInput.at(reverseMPHF.at(i)).second;
-                    size_t size = node.copyTo(treeNodeData + position);
-#ifndef NODEBUG
-                    TreeNode test(treeNodeData + position, size);
-                    assert(test.alphabetMapIndex == node.alphabetMapIndex);
-                    assert(test.minLCP == node.minLCP);
-                    assert(test.offsetsOffset == node.offsetsOffset);
-                    assert(test.directRankStoring == node.directRankStoring);
-                    if (!node.directRankStoring) {
-                        assert(test.bucketMapper->numBuckets() == node.bucketMapper->numBuckets());
-                        assert(test.bucketMapper->segments_count() == node.bucketMapper->segments_count());
-                    }
-#endif
-                    position += size;
+                    position += node.copyTo(treeNodeData + position);
                     assert(position <= treeNodeRawSize);
                 }
-                treeNodeDataOffsets.push_back(position);
+                treeNodeDataOffsets->push_back(position);
             }
             treeNodesInput.clear();
             treeNodesInput.shrink_to_fit();
+            treeNodeDataOffsets->buildRankSelect();
 
             //std::ofstream myfile("tree.dot");
             //exportTreeStructure(myfile);
@@ -398,17 +388,19 @@ class RecursiveDirectRankStoringMmphf {
             std::cout<<"Bucket offsets:      "<<1.0 * std::accumulate(bucketOffsets.begin(), bucketOffsets.end(), 0,
                                                                       [] (size_t size, auto &fano) { return size + fano.bit_size(); }) / N<<std::endl;
             std::cout<<"Tree node data:      "<<(8.0 * (sizeof(Mphf) + treeNodeRawSize) + treeNodesMphf.num_bits())/N<<std::endl;
+            std::cout<<"Node data pointers:  "<<(8.0 * treeNodeDataOffsets->space())/N<<std::endl;
             std::cout<<"Alphabet maps:       "<<8.0 * alphabetMaps.sizeInBytes() / N<<std::endl;
             std::cout<<"7-bit alphabets:     "<<alphabetMaps.size().first<<std::endl;
             std::cout<<"8-bit alphabets:     "<<alphabetMaps.size().second<<std::endl;
             std::cout<<"Height:              "<<bucketOffsets.size()<<std::endl;
-            std::cout<<"Nodes:               "<<treeNodeDataOffsets.size()<<std::endl;
+            std::cout<<"Nodes:               "<<treeNodeDataOffsets->size()<<std::endl;
 
             return retrieval.spaceBits()
                         + 8 * (sizeof(*this)
                             + sizeof(Mphf)
                             + bucketOffsets.size() * sizeof(void*)
-                            + treeNodeRawSize)
+                            + treeNodeRawSize
+                            + treeNodeDataOffsets->space())
                         + std::accumulate(bucketOffsets.begin(), bucketOffsets.end(), 0,
                                           [] (size_t size, auto &fano) { return size + fano.bit_size(); })
                         + 8 * alphabetMaps.sizeInBytes()
@@ -454,9 +446,10 @@ class RecursiveDirectRankStoringMmphf {
 
         uint64_t operator ()(const std::string &string) {
             TreePath path;
-            size_t treeNodeIndex = treeNodeDataOffsets.size() == 1 ? 0 : treeNodesMphf(path.currentNodeHash());
-            size_t offset = treeNodeDataOffsets.at(treeNodeIndex);
-            size_t nextOffset = treeNodeDataOffsets.at(treeNodeIndex + 1);
+            size_t treeNodeIndex = treeNodeDataOffsets->size() == 1 ? 0 : treeNodesMphf(path.currentNodeHash());
+            auto offsetPtr = treeNodeDataOffsets->at(treeNodeIndex);
+            size_t offset = *offsetPtr;
+            size_t nextOffset = *(++offsetPtr);
             TreeNode node(treeNodeData + offset, nextOffset - offset);
             size_t layer = 0;
             while (true) {
@@ -484,8 +477,9 @@ class RecursiveDirectRankStoringMmphf {
                     layer++;
                     path = path.getChild(bucket);
                     treeNodeIndex = treeNodesMphf(path.currentNodeHash());
-                    size_t nodeRawPtrOffset = treeNodeDataOffsets.at(treeNodeIndex);
-                    size_t nextNodeRawPtrOffset = treeNodeDataOffsets.at(treeNodeIndex + 1);
+                    offsetPtr = treeNodeDataOffsets->at(treeNodeIndex);
+                    size_t nodeRawPtrOffset = *offsetPtr;
+                    size_t nextNodeRawPtrOffset = *(++offsetPtr);
                     std::construct_at(&node, treeNodeData + nodeRawPtrOffset, nextNodeRawPtrOffset - nodeRawPtrOffset);
                 }
             }
