@@ -79,7 +79,7 @@ class UnalignedPGMIndex {
     }
 
     static size_t words_needed(uint8_t key_bits, uint8_t size_bits, uint8_t intercept_bits, size_t n_segments) {
-        auto bits = first_key_bits + 2 * bit_width_bits + 2 * size_bits
+        auto bits = first_key_bits + 3 * bit_width_bits + 2 * size_bits
             + (key_bits + slope_bits + intercept_bits) * n_segments - key_bits;
         return (bits + 63) / 64;
     }
@@ -107,8 +107,10 @@ class UnalignedPGMIndex {
         if (i + 1 < n_segments) {
             sdsl::bits::move_right(ptr, offset, key_bits);
             sdsl::bits::move_right(ptr, offset, slope_bits);
-            next_intercept = int64_t(sdsl::bits::read_int(ptr, offset, intercept_bits)) + i + 1;
+            next_intercept = int64_t(sdsl::bits::read_int_and_move(ptr, offset, intercept_bits)) + i + 1;
         }
+        assert(ptr < data() + size_in_bytes() / sizeof(uint64_t)
+                || (offset == 0 && ptr == data() + size_in_bytes() / sizeof(uint64_t)));
 
         return {key, slope, intercept, next_intercept};
     }
@@ -197,7 +199,8 @@ public:
         auto key_bits = std::bit_width(std::max<uint64_t>(1, segments.back().key - segments.front().key - (segments.size() - 1)));
         auto size_bits = std::bit_width(n - 1);
         auto intercept_bits = std::bit_width(std::max<uint64_t>(1, segments.back().intercept - (segments.size() - 1)));
-        auto ptr = new(align_val) uint64_t[words_needed(key_bits, size_bits, intercept_bits, segments.size())];
+        auto allocatedPtr = new(align_val) uint64_t[words_needed(key_bits, size_bits, intercept_bits, segments.size())];
+        auto ptr = allocatedPtr;
         one_segment = false;
         raw_ptr = reinterpret_cast<uint64_t>(ptr) >> 1;
         assert(reinterpret_cast<uint64_t>(ptr) == raw_ptr << 1);
@@ -217,6 +220,8 @@ public:
             sdsl::bits::write_int_and_move(ptr, as_uint32(segments[i].slope), offset, slope_bits);
             sdsl::bits::write_int_and_move(ptr, segments[i].intercept - i, offset, intercept_bits);
         }
+        assert((ptr - allocatedPtr) < size_in_bytes() / sizeof(uint64_t)
+                || (offset == 0 && (ptr - allocatedPtr) == size_in_bytes() / sizeof(uint64_t)));
     }
 
     /** Returns the approximate rank of @p key. */
