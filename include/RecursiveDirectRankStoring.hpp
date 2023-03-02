@@ -99,16 +99,16 @@ class RecursiveDirectRankStoringMmphf {
                 ptr += sizeof(uint16_t);
                 alphabetMapIndex = *((uint16_t*) ptr);
                 ptr += sizeof(uint16_t);
-                numChildren = *((uint32_t*) ptr);
-                ptr += sizeof(uint32_t);
                 offsetsOffset = *((uint32_t*) ptr);
                 ptr += sizeof(uint32_t);
 
                 if (length == 2 * sizeof(uint16_t) + 2 * sizeof(uint32_t)) {
+                    numChildren = *((uint32_t*) ptr);
+                    ptr += sizeof(uint32_t);
                     strategy = CHUNK_DRS;
                 } else {
                     strategy = MAPPER;
-                    bucketMapper = new BucketMapperType(ptr, length - (2 * sizeof(uint16_t) + 2 * sizeof(uint32_t)));
+                    bucketMapper = new BucketMapperType(ptr, length - (2 * sizeof(uint16_t) + 1 * sizeof(uint32_t)));
                 }
             }
 
@@ -121,7 +121,7 @@ class RecursiveDirectRankStoringMmphf {
                 if (strategy == CHUNK_DRS) {
                     return 2 * sizeof(uint16_t) + 2 * sizeof(uint32_t);
                 } else {
-                    return 2 * sizeof(uint16_t) + 2 * sizeof(uint32_t) + getBucketMapper().size();
+                    return 2 * sizeof(uint16_t) + 1 * sizeof(uint32_t) + getBucketMapper().size();
                 }
             }
 
@@ -130,13 +130,14 @@ class RecursiveDirectRankStoringMmphf {
                 ptr += sizeof(uint16_t);
                 *((uint16_t*) ptr) = alphabetMapIndex;
                 ptr += sizeof(uint16_t);
-                *((uint32_t*) ptr) = numChildren;
-                ptr += sizeof(uint32_t);
                 *((uint32_t*) ptr) = offsetsOffset;
                 ptr += sizeof(uint32_t);
 
                 if (strategy == MAPPER) {
                     bucketMapper->copyTo(ptr);
+                } else {
+                    *((uint32_t*) ptr) = numChildren;
+                    ptr += sizeof(uint32_t);
                 }
                 return rawSpaceUsage();
             }
