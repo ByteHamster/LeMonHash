@@ -188,7 +188,7 @@ class RecursiveDirectRankStoringMmphf {
             treeNode.minLCP = (*std::min_element(lcpsBegin + 1, lcpsBegin + nThisNode,
                                 [](const LcpDetails& x, const LcpDetails& y) {  return x.lcp < y.lcp; })).lcp;
 
-            if (!alphabetMaps.isFullForBits(LOG2_ALPHABET_MAPS_COUNT) && nThisNode > ALPHABET_MAPS_THRESHOLD) {
+            if ((!alphabetMaps.isFullForBits(LOG2_ALPHABET_MAPS_COUNT) && nThisNode > ALPHABET_MAPS_THRESHOLD) || alphabetMaps.empty()) {
                 AlphabetMap am(lcpsBegin, nThisNode);
                 if (!alphabetMaps.empty() && am.length64() == alphabetMaps.length64(ancestorAlphabetMapIndex)) {
                     treeNode.alphabetMapIndex = ancestorAlphabetMapIndex;
@@ -625,7 +625,7 @@ class RecursiveDirectRankStoringV2Mmphf {
             TreeNode treeNode;
             treeNode.offsetsOffset = bucketOffsets.at(layer).size();
 
-            if (!alphabetMaps.isFullForBits(LOG2_ALPHABET_MAPS_COUNT) && nThisNode > ALPHABET_MAPS_THRESHOLD) {
+            if ((!alphabetMaps.isFullForBits(LOG2_ALPHABET_MAPS_COUNT) && nThisNode > ALPHABET_MAPS_THRESHOLD) || alphabetMaps.empty()) {
                 AlphabetMap am(lcpsBegin, nThisNode);
                 if (!alphabetMaps.empty() && am.length64() == alphabetMaps.length64(ancestorAlphabetMapIndex)) {
                     treeNode.alphabetMapIndex = ancestorAlphabetMapIndex;
