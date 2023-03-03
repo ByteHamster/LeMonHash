@@ -78,10 +78,10 @@ class UnalignedPGMIndex {
         return {data()[0], key_bits, size_bits, intercept_bits, size, n_segments, 64 * (ptr - data()) + offset};
     }
 
-    static size_t words_needed(uint8_t key_bits, uint8_t size_bits, uint8_t intercept_bits, size_t n_segments) {
+    static size_t bytes_needed(uint8_t key_bits, uint8_t size_bits, uint8_t intercept_bits, size_t n_segments) {
         auto bits = first_key_bits + 3 * bit_width_bits + 2 * size_bits
             + (key_bits + slope_bits + intercept_bits) * n_segments - key_bits;
-        return (bits + 63) / 64;
+        return (bits + 7) / 8;
     }
 
     [[nodiscard]] uint64_t segment_key_delta(size_t i, size_t segments_offset,
@@ -109,8 +109,8 @@ class UnalignedPGMIndex {
             sdsl::bits::move_right(ptr, offset, slope_bits);
             next_intercept = int64_t(sdsl::bits::read_int_and_move(ptr, offset, intercept_bits)) + i + 1;
         }
-        assert(ptr < data() + size_in_bytes() / sizeof(uint64_t)
-                || (offset == 0 && ptr == data() + size_in_bytes() / sizeof(uint64_t)));
+        assert((ptr - data()) * 8 < size_in_bytes()
+                || ((ptr - data()) * 8 == size_in_bytes() && offset <= 8 * (size_in_bytes() % 8)));
 
         return {key, slope, intercept, next_intercept};
     }
@@ -201,7 +201,8 @@ public:
         auto key_bits = std::bit_width(std::max<uint64_t>(1, segments.back().key - segments.front().key - (segments.size() - 1)));
         auto size_bits = std::bit_width(n - 1);
         auto intercept_bits = std::bit_width(std::max<uint64_t>(1, segments.back().intercept - (segments.size() - 1)));
-        raw_ptr = new uint64_t[words_needed(key_bits, size_bits, intercept_bits, segments.size())];
+        size_t bytes = bytes_needed(key_bits, size_bits, intercept_bits, segments.size());
+        raw_ptr = new uint64_t[(bytes + 7) / 8];
         auto ptr = raw_ptr;
         one_segment = false;
 
@@ -220,8 +221,8 @@ public:
             sdsl::bits::write_int_and_move(ptr, as_uint32(segments[i].slope), offset, slope_bits);
             sdsl::bits::write_int_and_move(ptr, segments[i].intercept - i, offset, intercept_bits);
         }
-        assert((ptr - raw_ptr) < size_in_bytes() / sizeof(uint64_t)
-                || (offset == 0 && (ptr - raw_ptr) == size_in_bytes() / sizeof(uint64_t)));
+        assert((ptr - raw_ptr) * 8 < size_in_bytes()
+                || (ptr - raw_ptr) * 8 == size_in_bytes() && offset <= 8 * (size_in_bytes() % 8));
     }
 
     /** Returns the approximate rank of @p key. */
@@ -316,7 +317,7 @@ public:
         if (one_segment)
             return sizeof(uint64_t);
         auto [_, key_bits, size_bits, intercept_bits, _1, n_segments, _2] = metadata();
-        return words_needed(key_bits, size_bits, intercept_bits, n_segments) * sizeof(uint64_t);
+        return bytes_needed(key_bits, size_bits, intercept_bits, n_segments);
     }
 
     void copyTo(char *ptr) {
