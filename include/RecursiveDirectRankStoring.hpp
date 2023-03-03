@@ -476,9 +476,8 @@ class RecursiveDirectRankStoringMmphf {
         uint64_t operator ()(const std::string &string) {
             TreePath path;
             size_t treeNodeIndex = treeNodeDataOffsets->size() == 1 ? 0 : treeNodesMphf(path.currentNodeHash());
-            auto offsetPtr = treeNodeDataOffsets->at(treeNodeIndex);
-            size_t offset = *offsetPtr;
-            size_t nextOffset = *(++offsetPtr);
+            size_t offset = *treeNodeDataOffsets->at(treeNodeIndex);
+            size_t nextOffset = *treeNodeDataOffsets->at(treeNodeIndex + 1);
             TreeNode node(treeNodeData + offset, nextOffset - offset);
             size_t layer = 0;
             while (true) {
@@ -506,9 +505,8 @@ class RecursiveDirectRankStoringMmphf {
                     layer++;
                     path = path.getChild(bucket);
                     treeNodeIndex = treeNodesMphf(path.currentNodeHash());
-                    offsetPtr = treeNodeDataOffsets->at(treeNodeIndex);
-                    size_t nodeRawPtrOffset = *offsetPtr;
-                    size_t nextNodeRawPtrOffset = *(++offsetPtr);
+                    size_t nodeRawPtrOffset = *treeNodeDataOffsets->at(treeNodeIndex);
+                    size_t nextNodeRawPtrOffset = *(treeNodeDataOffsets->at(treeNodeIndex + 1));
                     std::construct_at(&node, treeNodeData + nodeRawPtrOffset, nextNodeRawPtrOffset - nodeRawPtrOffset);
                 }
             }
