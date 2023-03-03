@@ -22,7 +22,6 @@ namespace pgm {
  * So this does not actually return rank estimates.
  */
 class UnalignedPGMIndex {
-    static constexpr auto align_val = std::align_val_t(std::max<size_t>(__STDCPP_DEFAULT_NEW_ALIGNMENT__, 2));
     static constexpr uint8_t first_key_bits = 64;
     static constexpr uint8_t bit_width_bits = 6;
     static constexpr uint8_t slope_bits = 32;
@@ -34,8 +33,9 @@ class UnalignedPGMIndex {
 
     using K = uint64_t;
 
-    bool one_segment : 1;
-    uint64_t raw_ptr : 63;
+    bool one_segment = false;
+    uint64_t *raw_ptr;
+    uint64_t one_segment_content;
     bool createdFromRawPtr = false;
 
     // if !one_segment, then raw_ptr << 1 points to a memory area containing:
@@ -50,19 +50,19 @@ class UnalignedPGMIndex {
 
     [[nodiscard]] uint64_t *data() const {
         assert(!one_segment);
-        return reinterpret_cast<uint64_t *>(raw_ptr << 1);
+        return raw_ptr;
     }
 
     void free_data() {
         if (!one_segment && !createdFromRawPtr)
-            operator delete[] (data(), align_val);
+            delete[] data();
     }
 
     [[nodiscard]] std::tuple<uint32_t, float, int32_t> get_one_segment() const {
         assert(one_segment);
-        auto n = uint32_t(raw_ptr >> (one_segment_intercept_bits + slope_bits));
-        auto slope = as_float(uint32_t((raw_ptr >> one_segment_intercept_bits) & 0xFFFFFFFF));
-        auto intercept = int32_t(raw_ptr & ((1ull << one_segment_intercept_bits) - 1)) - max_one_segment_intercept;
+        auto n = uint32_t(one_segment_content >> (one_segment_intercept_bits + slope_bits));
+        auto slope = as_float(uint32_t((one_segment_content >> one_segment_intercept_bits) & 0xFFFFFFFF));
+        auto intercept = int32_t(one_segment_content & ((1ull << one_segment_intercept_bits) - 1)) - max_one_segment_intercept;
         return {n, slope, intercept};
     }
 
@@ -144,6 +144,8 @@ public:
         if (this != &other) {
             free_data();
             one_segment = other.one_segment;
+            createdFromRawPtr = other.createdFromRawPtr;
+            one_segment_content = other.one_segment_content;
             raw_ptr = other.raw_ptr;
             other.one_segment = false;
             other.raw_ptr = 0;
@@ -188,9 +190,9 @@ public:
             auto [slope, intercept] = first_segment.get_floating_point_segment(0);
             if (intercept > -max_one_segment_intercept && intercept < max_one_segment_intercept) {
                 one_segment = true;
-                raw_ptr = n << (one_segment_intercept_bits + slope_bits);
-                raw_ptr |= uint64_t(as_uint32(slope)) << one_segment_intercept_bits;
-                raw_ptr |= int64_t(intercept) + max_one_segment_intercept;
+                one_segment_content = n << (one_segment_intercept_bits + slope_bits);
+                one_segment_content |= uint64_t(as_uint32(slope)) << one_segment_intercept_bits;
+                one_segment_content |= int64_t(intercept) + max_one_segment_intercept;
                 assert(get_one_segment() == std::make_tuple((uint32_t) n, (float) slope, (int32_t) intercept));
                 return;
             }
@@ -199,11 +201,9 @@ public:
         auto key_bits = std::bit_width(std::max<uint64_t>(1, segments.back().key - segments.front().key - (segments.size() - 1)));
         auto size_bits = std::bit_width(n - 1);
         auto intercept_bits = std::bit_width(std::max<uint64_t>(1, segments.back().intercept - (segments.size() - 1)));
-        auto allocatedPtr = new(align_val) uint64_t[words_needed(key_bits, size_bits, intercept_bits, segments.size())];
-        auto ptr = allocatedPtr;
+        raw_ptr = new uint64_t[words_needed(key_bits, size_bits, intercept_bits, segments.size())];
+        auto ptr = raw_ptr;
         one_segment = false;
-        raw_ptr = reinterpret_cast<uint64_t>(ptr) >> 1;
-        assert(reinterpret_cast<uint64_t>(ptr) == raw_ptr << 1);
 
         uint8_t offset = 0;
         sdsl::bits::write_int_and_move(ptr, segments.front().key, offset, first_key_bits);
@@ -220,8 +220,8 @@ public:
             sdsl::bits::write_int_and_move(ptr, as_uint32(segments[i].slope), offset, slope_bits);
             sdsl::bits::write_int_and_move(ptr, segments[i].intercept - i, offset, intercept_bits);
         }
-        assert((ptr - allocatedPtr) < size_in_bytes() / sizeof(uint64_t)
-                || (offset == 0 && (ptr - allocatedPtr) == size_in_bytes() / sizeof(uint64_t)));
+        assert((ptr - raw_ptr) < size_in_bytes() / sizeof(uint64_t)
+                || (offset == 0 && (ptr - raw_ptr) == size_in_bytes() / sizeof(uint64_t)));
     }
 
     /** Returns the approximate rank of @p key. */
@@ -321,7 +321,7 @@ public:
 
     void copyTo(char *ptr) {
         if (one_segment) {
-            *((uint64_t *) ptr) = raw_ptr;
+            *((uint64_t *) ptr) = one_segment_content;
         } else {
             memcpy(ptr, (void *)data(), size_in_bytes());
         }
@@ -331,9 +331,9 @@ public:
         createdFromRawPtr = true;
         if (size == sizeof(uint64_t)) {
             one_segment = true;
-            raw_ptr = *((uint64_t *) ptr);
+            one_segment_content = *((uint64_t *) ptr);
         } else {
-            raw_ptr = reinterpret_cast<uint64_t>(ptr) >> 1;
+            raw_ptr = (uint64_t *) ptr;
             one_segment = false;
         }
     }
