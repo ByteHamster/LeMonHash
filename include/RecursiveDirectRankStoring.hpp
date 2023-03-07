@@ -14,6 +14,7 @@
 #include <MurmurHash64.h>
 #include "support/PartitionedEliasFano.hpp"
 #include <pthash.hpp>
+#include <uniform_partitioned_sequence.hpp>
 #include "support/TreePath.hpp"
 #include "support/AlphabetMapsCollection.h"
 
@@ -148,7 +149,9 @@ class RecursiveDirectRankStoringMmphf {
         std::vector<std::pair<uint64_t, TreeNode>> treeNodesInput;
         char *treeNodeData = nullptr;
         size_t treeNodeRawSize = 0;
-        util::EliasFanoM *treeNodeDataOffsets = nullptr;
+        succinct::bit_vector treeNodeDataOffsets_bv;
+        ds2i::compact_elias_fano::enumerator treeNodeDataOffsets;
+
         using Mphf = pthash::single_phf<pthash::murmurhash2_64, pthash::compact_compact, true>;
         Mphf treeNodesMphf;
         std::vector<DuplicateFilterRank<PartitionedEliasFano>> bucketOffsets;
@@ -172,12 +175,12 @@ class RecursiveDirectRankStoringMmphf {
                 treeNodeRawSize += node.second.rawSpaceUsage();
             }
             treeNodeData = static_cast<char *>(malloc(treeNodeRawSize));
-            treeNodeDataOffsets = new util::EliasFanoM(treeNodesInput.size() + 1, treeNodeRawSize + 1);
+            std::vector<uint64_t> dataOffsets;
 
             if (treeNodesInput.size() == 1) {
-                treeNodeDataOffsets->push_back(0);
+                dataOffsets.push_back(0);
                 size_t size = treeNodesInput.front().second.copyTo(treeNodeData);
-                treeNodeDataOffsets->push_back(size);
+                dataOffsets.push_back(size);
                 assert(size <= treeNodeRawSize);
             } else {
                 std::vector<uint64_t> mphfInput;
@@ -201,7 +204,7 @@ class RecursiveDirectRankStoringMmphf {
                 }
                 size_t position = 0;
                 for (size_t i = 0; i < treeNodesInput.size(); i++) {
-                    treeNodeDataOffsets->push_back(position);
+                    dataOffsets.push_back(position);
                     TreeNode &node = treeNodesInput.at(reverseMPHF.at(i)).second;
                     size_t size = node.copyTo(treeNodeData + position);
 #ifndef NODEBUG
@@ -220,11 +223,19 @@ class RecursiveDirectRankStoringMmphf {
                     position += size;
                     assert(position <= treeNodeRawSize);
                 }
-                treeNodeDataOffsets->push_back(position);
+                dataOffsets.push_back(position);
             }
             treeNodesInput.clear();
             treeNodesInput.shrink_to_fit();
-            treeNodeDataOffsets->buildRankSelect();
+
+            size_t universe = dataOffsets.back() + 1;
+            succinct::bit_vector_builder bvb;
+            ds2i::global_parameters params;
+            ds2i::compact_elias_fano::write(
+                    bvb, dataOffsets.begin(), universe, dataOffsets.size(), params);
+            succinct::bit_vector(&bvb).swap(treeNodeDataOffsets_bv);
+            treeNodeDataOffsets = ds2i::compact_elias_fano::enumerator(
+                    treeNodeDataOffsets_bv, 0, universe, dataOffsets.size(), params);
 
             //std::ofstream myfile("tree.dot");
             //exportTreeStructure(myfile);
@@ -405,19 +416,19 @@ class RecursiveDirectRankStoringMmphf {
             std::cout<<"Bucket offsets:      "<<1.0 * std::accumulate(bucketOffsets.begin(), bucketOffsets.end(), 0,
                                                                       [] (size_t size, auto &fano) { return size + fano.bit_size(); }) / N<<std::endl;
             std::cout<<"Tree node data:      "<<(8.0 * (sizeof(Mphf) + treeNodeRawSize) + treeNodesMphf.num_bits())/N<<std::endl;
-            std::cout<<"Node data pointers:  "<<(8.0 * treeNodeDataOffsets->space())/N<<std::endl;
+            std::cout<<"Node data pointers:  "<<(1.0 * treeNodeDataOffsets_bv.size())/N<<std::endl;
             std::cout<<"Alphabet maps:       "<<8.0 * alphabetMaps.sizeInBytes() / N<<std::endl;
             std::cout<<"7-bit alphabets:     "<<alphabetMaps.size().first<<std::endl;
             std::cout<<"8-bit alphabets:     "<<alphabetMaps.size().second<<std::endl;
             std::cout<<"Height:              "<<bucketOffsets.size()<<std::endl;
-            std::cout<<"Nodes:               "<<treeNodeDataOffsets->size()<<std::endl;
+            std::cout<<"Nodes:               "<<treeNodeDataOffsets.size()<<std::endl;
 
             return retrieval.spaceBits()
                         + 8 * (sizeof(*this)
                             + sizeof(Mphf)
                             + bucketOffsets.size() * sizeof(void*)
-                            + treeNodeRawSize
-                            + treeNodeDataOffsets->space())
+                            + treeNodeRawSize)
+                        + treeNodeDataOffsets_bv.size()
                         + std::accumulate(bucketOffsets.begin(), bucketOffsets.end(), 0,
                                           [] (size_t size, auto &fano) { return size + fano.bit_size(); })
                         + 8 * alphabetMaps.sizeInBytes()
@@ -463,8 +474,8 @@ class RecursiveDirectRankStoringMmphf {
 
         uint64_t operator ()(const std::string &string) {
             TreePath path;
-            size_t treeNodeIndex = treeNodeDataOffsets->size() == 1 ? 0 : treeNodesMphf(path.currentNodeHash());
-            TreeNode node(treeNodeData + *treeNodeDataOffsets->at(treeNodeIndex));
+            size_t treeNodeIndex = treeNodeDataOffsets.size() == 1 ? 0 : treeNodesMphf(path.currentNodeHash());
+            TreeNode node(treeNodeData + treeNodeDataOffsets.move(treeNodeIndex).second);
             size_t layer = 0;
             while (true) {
                 uint64_t chunk = extractChunk(string, node);
@@ -492,7 +503,7 @@ class RecursiveDirectRankStoringMmphf {
                     layer++;
                     path = path.getChild(bucket);
                     treeNodeIndex = treeNodesMphf(path.currentNodeHash());
-                    std::construct_at(&node, treeNodeData + *treeNodeDataOffsets->at(treeNodeIndex));
+                    std::construct_at(&node, treeNodeData + treeNodeDataOffsets.move(treeNodeIndex).second);
                 }
             }
         }
