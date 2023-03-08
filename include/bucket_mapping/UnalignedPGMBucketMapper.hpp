@@ -71,8 +71,8 @@ struct UnalignedPGMBucketMapper {
         return std::string("UnalignedPgmBucketMapper");
     }
 
-    UnalignedPGMBucketMapper(const char *ptr, size_t size) {
-        pgm = pgm::UnalignedPGMIndex(ptr, size);
+    explicit UnalignedPGMBucketMapper(const char *ptr) {
+        pgm = pgm::UnalignedPGMIndex(ptr);
     }
 
     void copyTo(char *ptr) {
