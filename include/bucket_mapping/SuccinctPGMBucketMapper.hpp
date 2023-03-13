@@ -29,7 +29,7 @@ struct SuccinctPGMBucketMapper {
         };
 
         // Evaluate PGM
-        for (auto epsilon : {63, 31, 15, 7, 3}) {
+        for (auto epsilon : {63, 31, 15}) {
             auto *p = new type(begin, end, epsilon);
 
             cost = p->size_in_bytes() * 8;
