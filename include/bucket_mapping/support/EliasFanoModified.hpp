@@ -27,6 +27,25 @@ static uint8_t elias_fano_lo_width(size_t universe, size_t ones) {
     return low_width;
 }
 
+/** Finds the next set bit after a given position. */
+static uint64_t nextOne(size_t i, const uint64_t *data) {
+    auto wordIdx = i / 64;
+    auto word = data[wordIdx] & sdsl::bits::lo_unset[i % 64];
+    word &= word - 1;
+    while (word == 0)
+        word = data[++wordIdx];
+    return wordIdx * 64 + __builtin_ctzll(word);
+}
+
+/** Finds the previous set bit before a given position. */
+static uint64_t prevOne(size_t i, const uint64_t *data) {
+    auto wordIdx = i / 64;
+    auto word = data[wordIdx] & sdsl::bits::lo_set[i % 64];
+    while (word == 0)
+        word = data[--wordIdx];
+    return wordIdx * 64 + 63 - __builtin_clzll(word);
+}
+
 /**
  * Compressed, monotone integer array.
  * Commonly used to store the positions of 1-bits in sparse bit vectors.
@@ -74,10 +93,7 @@ public:
             }
             assert(fano->H[positionH] == 1);
             positionL++;
-            positionH++;
-            while (fano->H[positionH] == 0) {
-                positionH++;
-            }
+            positionH = nextOne(positionH, fano->H.data().data());
             assert(fano->H[positionH] == 1);
             return *this;
         }
@@ -92,10 +108,7 @@ public:
             assert(positionL > 0);
             assert(fano->H[positionH] == 1);
             positionL--;
-            positionH--;
-            while (positionH > 0 && fano->H[positionH] == 0) {
-                positionH--;
-            }
+            positionH = prevOne(positionH, fano->H.data().data());
             assert(fano->H[positionH] == 1);
             return *this;
         }
@@ -238,7 +251,7 @@ public:
         while (H[positionH] == 0) {
             positionH++;
         }
-        return ElementPointer(positionH, 0, *this);
+        return {positionH, 0, *this};
     }
 
     [[nodiscard]] ElementPointer at(size_t position) const {
@@ -246,7 +259,7 @@ public:
             throw std::logic_error("Rank/Select not initialized yet. Missing call to buildRankSelect");
         }
         uint64_t positionH = rankSelect->select1(position + 1);
-        return ElementPointer(positionH, position, *this);
+        return {positionH, position, *this};
     }
 
     [[nodiscard]] uint64_t universe_size() {
@@ -380,21 +393,12 @@ struct SequentialEliasFano {
 
         /** Moves hiPos to the next set bit in the high part */
         void nextHi() {
-            auto wordIdx = hiPos / 64;
-            uint64_t word = data[wordIdx] & uint64_t(-1) << (hiPos % 64);
-            word &= word - 1;
-            while (word == 0)
-                word = data[++wordIdx];
-            hiPos = wordIdx * 64 + __builtin_ctzll(word);
+            hiPos = nextOne(hiPos, data);
         }
 
         /** Moves hiPos to the previous set bit in the high part */
         void prevHi() {
-            auto wordIdx = hiPos / 64;
-            uint64_t word = data[wordIdx] & ((uint64_t(1) << hiPos % 64) - 1);
-            while (word == 0)
-                word = data[--wordIdx];
-            hiPos = wordIdx * 64 + 63 - __builtin_clzll(word);
+            hiPos = prevOne(hiPos, data);
         }
     };
 };
