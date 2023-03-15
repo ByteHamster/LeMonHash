@@ -180,64 +180,43 @@ public:
         assert(element >= *at(0));
 
         const uint64_t elementH = element >> lowerBits();
-        const uint64_t elementL = element & maskLowerBits();
-        uint64_t positionH;
-        uint64_t positionL;
-        if (elementH == 0) {
-            positionH = 0;
-            positionL = 0;
-        } else {
-            positionH = rankSelect->select0(elementH) + 1;
-            assert(positionH <= H.size());
-            positionL = positionH - elementH;
-            assert(positionL <= L.size());
-        }
-        if (H[positionH] == 0 || positionL == L.size()) {
-            // No item with same upper bits stored
-            if (positionL > 0) {
-                // Return previous item
-                positionL--;
-                positionH--; // positionH >= positionL, so no underflow
-            }
-        } else if (lowerBits() != 0) {
-            // Look through elements with the same upper bits
-            while (true) {
-                const uint64_t lower = L[positionL];
-                if (lower > elementL) {
-                    // Return previous item
-                    if (positionL > 0) {
-                        positionL--;
-                        positionH--; // positionH >= positionL, so no underflow
-                    }
-                    break;
-                } else if (lower == elementL) {
-                    // Return first equal item
-                    break;
-                } else if (H[positionH + 1] == 0) {
-                    // End of section. Next item will be larger, so return this.
-                    break;
-                }
-                positionH++;
-                positionL++;
-            }
-        }
-        // In case we returned the last item of the previous block, we need to find out its upper bits.
-        while (positionH > 0 && H[positionH] == 0) {
-            positionH--;
-        }
-        assert(*at(positionL) <= element);
-        assert(positionL == count - 1 || *at(positionL + 1) >= element);
-        assert(positionL == 0 || *at(positionL - 1) < element);
+        auto positionH = rankSelect->select0(elementH + 1);
 
-        ElementPointer ptr(positionH, positionL, *this);
+        auto rankHi = positionH - elementH;
+        if (rankHi == 0)
+            return {0, 0, *this};
+
+        auto rankLo = elementH == 0 ? 0 : rankSelect->select0(elementH) - elementH + 1;
+        const uint64_t elementL = element & maskLowerBits();
+
+        auto bucketCount = rankHi - rankLo;
+        while (bucketCount > 0) {
+            auto step = bucketCount / 2;
+            auto mid = rankLo + step;
+            if (L[mid] <= elementL) {
+                rankLo = mid + 1;
+                bucketCount -= step + 1;
+            } else {
+                bucketCount = step;
+            }
+        }
+
+        if (rankLo > 0)
+            --rankLo;
+        positionH -= rankHi - rankLo;
+
+        if (H[positionH] == 0)
+            positionH = prevOne(positionH, H.data().data());
+
+        ElementPointer ptr(positionH, rankLo, *this);
         #ifndef NDEBUG
         assert(*ptr <= element);
-        if (positionL < count - 1) {
+        if (rankLo < count - 1) {
             ++ptr;
             assert(*ptr >= element);
             --ptr;
         }
-        if (positionL > 0) {
+        if (rankLo > 0) {
             --ptr;
             assert(*ptr < element);
             ++ptr;
