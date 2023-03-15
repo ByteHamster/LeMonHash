@@ -17,17 +17,19 @@
  * Given that we expect only one object per bucket, we can usually use a 1-bit retrieval data structure.
  * The bucket sizes are stored with Elias-Fano.
  */
-template <typename BucketMapper>
+template <typename BucketMapper, size_t retrievalCoeffBits = 64>
 class DirectRankStoringMmphf {
     public:
         size_t N;
     private:
         BucketMapper bucketMapper;
-        MultiRetrievalDataStructure retrievalDataStructure;
+        MultiRetrievalDataStructure<retrievalCoeffBits> retrievalDataStructure;
         util::EliasFano<util::floorlog2(std::max(1.0f, BucketMapper::elementsPerBucket()))> bucketSizePrefix;
     public:
         static std::string name() {
-            return "DirectRankStoringMmphf bucketMapper=" + BucketMapper::name();
+            return std::string("DirectRankStoringMmphf")
+                   + " bucketMapper=" + BucketMapper::name()
+                   + " retrievalCoeffBits=" + std::to_string(retrievalCoeffBits);
         }
 
         explicit DirectRankStoringMmphf(const std::vector<uint64_t> &data)

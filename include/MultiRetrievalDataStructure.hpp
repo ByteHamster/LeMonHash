@@ -9,16 +9,17 @@
  * Can be indexed by specifying the *range* of the values to store/query.
  * An alternative method would be to specify the number of bits of each object.
  */
+template <size_t coeffBits = 64>
 class MultiRetrievalDataStructure {
     private:
-        SimpleRibbon<1> *retrieval1;
-        SimpleRibbon<2> *retrieval2;
-        SimpleRibbon<3> *retrieval3;
-        SimpleRibbon<4> *retrieval4;
-        SimpleRibbon<5> *retrieval5;
-        SimpleRibbon<6> *retrieval6;
-        SimpleRibbon<7> *retrieval7;
-        SimpleRibbon<32, 64, uint32_t> *retrieval8Plus;
+        SimpleRibbon<1, coeffBits> *retrieval1 = nullptr;
+        SimpleRibbon<2, coeffBits> *retrieval2 = nullptr;
+        SimpleRibbon<3, coeffBits> *retrieval3 = nullptr;
+        SimpleRibbon<4, coeffBits> *retrieval4 = nullptr;
+        SimpleRibbon<5, coeffBits> *retrieval5 = nullptr;
+        SimpleRibbon<6, coeffBits> *retrieval6 = nullptr;
+        SimpleRibbon<7, coeffBits> *retrieval7 = nullptr;
+        SimpleRibbon<32, 64, uint32_t> *retrieval8Plus = nullptr;
 
         std::vector<std::pair<uint64_t, uint8_t>> retrieval1Input;
         std::vector<std::pair<uint64_t, uint8_t>> retrieval2Input;
@@ -50,13 +51,13 @@ class MultiRetrievalDataStructure {
         }
 
         void build() {
-            retrieval1 = new SimpleRibbon<1>(retrieval1Input);
-            retrieval2 = new SimpleRibbon<2>(retrieval2Input);
-            retrieval3 = new SimpleRibbon<3>(retrieval3Input);
-            retrieval4 = new SimpleRibbon<4>(retrieval4Input);
-            retrieval5 = new SimpleRibbon<5>(retrieval5Input);
-            retrieval6 = new SimpleRibbon<6>(retrieval6Input);
-            retrieval7 = new SimpleRibbon<7>(retrieval7Input);
+            retrieval1 = new SimpleRibbon<1, coeffBits>(retrieval1Input);
+            retrieval2 = new SimpleRibbon<2, coeffBits>(retrieval2Input);
+            retrieval3 = new SimpleRibbon<3, coeffBits>(retrieval3Input);
+            retrieval4 = new SimpleRibbon<4, coeffBits>(retrieval4Input);
+            retrieval5 = new SimpleRibbon<5, coeffBits>(retrieval5Input);
+            retrieval6 = new SimpleRibbon<6, coeffBits>(retrieval6Input);
+            retrieval7 = new SimpleRibbon<7, coeffBits>(retrieval7Input);
             retrieval8Plus = new SimpleRibbon<32, 64, uint32_t>(retrieval8PlusInput);
 
             retrieval1Input.clear();

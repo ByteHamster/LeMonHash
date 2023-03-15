@@ -119,7 +119,7 @@ class RecursiveDirectRankStoringMmphf {
             ~TreeNode() { destroyBucketMapper(); }
         };
 
-        MultiRetrievalDataStructure retrieval;
+        MultiRetrievalDataStructure<> retrieval;
         size_t N = 0;
         std::vector<std::pair<uint64_t, TreeNode>> treeNodesInput;
         std::vector<TreeNode> treeNodes;
@@ -559,7 +559,7 @@ class RecursiveDirectRankStoringV2Mmphf {
         };
         #pragma pack(pop)
 
-        MultiRetrievalDataStructure retrieval;
+        MultiRetrievalDataStructure<> retrieval;
         size_t N = 0;
         std::vector<std::pair<uint64_t, TreeNode>> treeNodesInput;
         std::vector<TreeNode> treeNodes;
