@@ -1,7 +1,7 @@
 #include <unordered_set>
 #include <tlx/cmdline_parser.hpp>
-#include <DirectRankStoring.hpp>
-#include <RecursiveDirectRankStoring.hpp>
+#include <LeMonHash.hpp>
+#include <LeMonHashVL.hpp>
 #include "simpleMmphfBenchmark.hpp"
 
 std::vector<uint64_t> loadIntegerFile(std::string &filename, size_t maxN) {
@@ -89,12 +89,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    //doTest<BinarySearchMmphf>(inputData);
-    //doTest<DirectRetrievalMmphf>(inputData);
-    //simpleMmphfBenchmark<DirectRankStoringMmphf<LinearBucketMapper<1.0f>>>(inputData);
-    //simpleMmphfBenchmark<DirectRankStoringMmphf<LinearBucketMapper<1.125f>>>(inputData);
-    //simpleMmphfBenchmark<DirectRankStoringMmphf<PGMBucketMapper>>(inputData);
-    simpleMmphfBenchmark<DirectRankStoringMmphf<SuccinctPGMBucketMapper>>(inputData, datasetName);
+    simpleMmphfBenchmark<LeMonHash<SuccinctPGMBucketMapper>>(inputData, datasetName);
 
     std::vector<std::string> inputAsString;
     inputAsString.reserve(inputData.size());
@@ -102,7 +97,7 @@ int main(int argc, char** argv) {
         uint64_t swapped = __builtin_bswap64(x);
         inputAsString.emplace_back((char*) &swapped, sizeof(uint64_t));
     }
-    simpleMmphfBenchmark<RecursiveDirectRankStoringMmphf>(inputAsString, datasetName);
+    simpleMmphfBenchmark<LeMonHashVL>(inputAsString, datasetName);
 
     return 0;
 }

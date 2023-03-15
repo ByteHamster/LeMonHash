@@ -5,20 +5,19 @@
 #include <iostream>
 #include <EliasFano.h>
 #include <Function.h>
-#include "MultiRetrievalDataStructure.hpp"
+#include "support/MultiRetrievalDataStructure.hpp"
 #include "bucket_mapping/LinearBucketMapper.hpp"
 #include "bucket_mapping/PGMBucketMapper.hpp"
 #include "bucket_mapping/SuccinctPGMBucketMapper.hpp"
 
 /**
- * Monotone Minimal Perfect Hash Function (MMPHF) using the Direct Rank Storing (DRS) technique.
- * Each object is mapped to a bucket (using different techniques).
+ * Learned Monotone Minimal Perfect Hash Function (MMPHF).
+ * Each object is mapped to a bucket using the PGM index.
  * Within the buckets, a retrieval data structure explicitly stores the ranks of all objects.
- * Given that we expect only one object per bucket, we can usually use a 1-bit retrieval data structure.
- * The bucket sizes are stored with Elias-Fano.
+ * The prefix sum of bucket sizes is stored with Elias-Fano.
  */
-template <typename BucketMapper, size_t retrievalCoeffBits = 64>
-class DirectRankStoringMmphf {
+template <typename BucketMapper = SuccinctPGMBucketMapper, size_t retrievalCoeffBits = 64>
+class LeMonHash {
     public:
         size_t N;
     private:
@@ -27,12 +26,12 @@ class DirectRankStoringMmphf {
         util::EliasFano<util::floorlog2(std::max(1.0f, BucketMapper::elementsPerBucket()))> bucketSizePrefix;
     public:
         static std::string name() {
-            return std::string("DirectRankStoringMmphf")
+            return std::string("LeMonHash")
                    + " bucketMapper=" + BucketMapper::name()
                    + " retrievalCoeffBits=" + std::to_string(retrievalCoeffBits);
         }
 
-        explicit DirectRankStoringMmphf(const std::vector<uint64_t> &data)
+        explicit LeMonHash(const std::vector<uint64_t> &data)
                 : N(data.size()),
                   bucketMapper(data.begin(), data.end()),
                   bucketSizePrefix(bucketMapper.numBuckets() + 1, data.size() + 1) {

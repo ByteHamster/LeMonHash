@@ -1,9 +1,9 @@
 #include <unordered_set>
 #include <tlx/cmdline_parser.hpp>
-#include <DirectRankStoring.hpp>
-#include "simpleMmphfBenchmark.hpp"
 #include <XorShift64.h>
-#include "RecursiveDirectRankStoring.hpp"
+#include <LeMonHashVL.hpp>
+#include <LeMonHashVLIndexed.hpp>
+#include "simpleMmphfBenchmark.hpp"
 
 std::string stringOfLength(size_t length, util::XorShift64 &prng) {
     std::string key(length, 'x');
@@ -81,8 +81,8 @@ int main(int argc, char** argv) {
 
     size_t positionOfSlash = filename.find_last_of('/');
     std::string baseFilename = positionOfSlash == std::string::npos ? filename : filename.substr(positionOfSlash + 1);
-    simpleMmphfBenchmark<RecursiveDirectRankStoringMmphf>(inputData, baseFilename);
-    simpleMmphfBenchmark<RecursiveDirectRankStoringV2Mmphf>(inputData, baseFilename);
+    simpleMmphfBenchmark<LeMonHashVL>(inputData, baseFilename);
+    simpleMmphfBenchmark<LeMonHashVLIndexed>(inputData, baseFilename);
 
     return 0;
 }
