@@ -34,7 +34,6 @@ static uint8_t elias_fano_lo_width(size_t universe, size_t ones) {
 class EliasFanoM {
 private:
     sdsl::int_vector<> L;
-    using ConstIntVector = const sdsl::int_vector<>;
     pasta::BitVector H;
     size_t count = 0;
     size_t universeSize = 0;
@@ -58,12 +57,11 @@ public:
     private:
         size_t positionL;
         size_t positionH;
-        size_t h;
         const EliasFanoM *fano;
 
     public:
-        ElementPointer(size_t h, size_t positionH, size_t positionL, const EliasFanoM &fano)
-            : positionL(positionL), positionH(positionH), h(h), fano(&fano) {
+        ElementPointer(size_t positionH, size_t positionL, const EliasFanoM &fano)
+            : positionL(positionL), positionH(positionH), fano(&fano) {
             assert(fano.H[positionH] == 1);
         }
 
@@ -79,7 +77,6 @@ public:
             positionH++;
             while (fano->H[positionH] == 0) {
                 positionH++;
-                h++;
             }
             assert(fano->H[positionH] == 1);
             return *this;
@@ -98,7 +95,6 @@ public:
             positionH--;
             while (positionH > 0 && fano->H[positionH] == 0) {
                 positionH--;
-                h--;
             }
             assert(fano->H[positionH] == 1);
             return *this;
@@ -106,11 +102,8 @@ public:
 
         uint64_t operator*() const {
             assert(positionL < fano->count);
-            if (fano->lowerBits() == 0) {
-                return h;
-            }
-            uint64_t l = static_cast<ConstIntVector &>(fano->L)[positionL];
-            return (h << fano->lowerBits()) + l;
+            uint64_t l = fano->lowerBits() ? fano->L[positionL] : 0;
+            return ((positionH - positionL) << fano->lowerBits()) | l;
         }
 
         size_t operator-(const ElementPointer &pointer) const {
@@ -196,7 +189,7 @@ public:
         } else if (lowerBits() != 0) {
             // Look through elements with the same upper bits
             while (true) {
-                const uint64_t lower = static_cast<ConstIntVector &>(L)[positionL];
+                const uint64_t lower = L[positionL];
                 if (lower > elementL) {
                     // Return previous item
                     if (positionL > 0) {
@@ -216,16 +209,14 @@ public:
             }
         }
         // In case we returned the last item of the previous block, we need to find out its upper bits.
-        uint64_t resultH = elementH;
         while (positionH > 0 && H[positionH] == 0) {
             positionH--;
-            resultH--;
         }
         assert(*at(positionL) <= element);
         assert(positionL == count - 1 || *at(positionL + 1) >= element);
         assert(positionL == 0 || *at(positionL - 1) < element);
 
-        ElementPointer ptr(resultH, positionH, positionL, *this);
+        ElementPointer ptr(positionH, positionL, *this);
         #ifndef NDEBUG
         assert(*ptr <= element);
         if (positionL < count - 1) {
@@ -243,13 +234,11 @@ public:
     }
 
     ElementPointer begin() const {
-        size_t h = 0;
         size_t positionH = 0;
         while (H[positionH] == 0) {
             positionH++;
-            h++;
         }
-        return ElementPointer(h, positionH, 0, *this);
+        return ElementPointer(positionH, 0, *this);
     }
 
     [[nodiscard]] ElementPointer at(size_t position) const {
@@ -257,8 +246,7 @@ public:
             throw std::logic_error("Rank/Select not initialized yet. Missing call to buildRankSelect");
         }
         uint64_t positionH = rankSelect->select1(position + 1);
-        uint64_t h = positionH - position;
-        return ElementPointer(h, positionH, position, *this);
+        return ElementPointer(positionH, position, *this);
     }
 
     [[nodiscard]] uint64_t universe_size() {
