@@ -71,4 +71,8 @@ struct UnalignedPGMBucketMapper {
         return "UnalignedPGMBucketMapper";
     }
 
+    [[nodiscard]] std::string info() const {
+        return "";
+    }
+
 };

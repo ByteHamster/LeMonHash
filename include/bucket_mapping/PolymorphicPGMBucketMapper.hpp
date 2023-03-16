@@ -72,4 +72,8 @@ struct PolymorphicPGMBucketMapper {
         return "PolymorphicPGMBucketMapper";
     }
 
+    [[nodiscard]] std::string info() const {
+        return "";
+    }
+
 };

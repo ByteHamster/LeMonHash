@@ -5,6 +5,7 @@
 #include <unordered_set>
 #include <algorithm>
 #include <bit>
+#include <set>
 
 struct LcpDetails {
     uint32_t lcp;
