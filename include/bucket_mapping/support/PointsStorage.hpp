@@ -165,7 +165,7 @@ class EFPointsStorageV2 {
 public:
 
     EFPointsStorageV2() {
-        static bool execute_once = [](){
+        [[maybe_unused]] static bool execute_once = [](){
             ys_params.ef_log_sampling0 = 63; // rank is not needed on the ys
             return true;
         } ();

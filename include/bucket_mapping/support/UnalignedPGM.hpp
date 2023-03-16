@@ -219,8 +219,8 @@ public:
             sdsl::bits::write_int_and_move(ptr, as_uint32(segments[i].slope), offset, slope_bits);
             sdsl::bits::write_int_and_move(ptr, segments[i].intercept - i, offset, intercept_bits);
         }
-        assert((ptr - allocatedPtr) < size_in_bytes() / sizeof(uint64_t)
-                || (offset == 0 && (ptr - allocatedPtr) == size_in_bytes() / sizeof(uint64_t)));
+        assert(size_t(ptr - allocatedPtr) < size_in_bytes() / sizeof(uint64_t)
+                || (offset == 0 && size_t(ptr - allocatedPtr) == size_in_bytes() / sizeof(uint64_t)));
     }
 
     /** Returns the approximate rank of @p key. */
