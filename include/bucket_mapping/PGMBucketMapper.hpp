@@ -1,6 +1,5 @@
 #pragma once
 
-#include "BucketMapper.hpp"
 #include "support/PGM.hpp"
 #include <bit>
 
@@ -8,7 +7,7 @@
  * Uses the PGM Index to get an approximate rank, which we use as bucket index.
  * Has small space overhead for uniform distribution, but enables using other distributions.
  */
-struct PGMBucketMapper : public BucketMapper {
+struct PGMBucketMapper {
     pgm::PGMIndex<uint64_t> pgmIndex;
     size_t numBuckets_;
 
@@ -43,19 +42,20 @@ struct PGMBucketMapper : public BucketMapper {
         numBuckets_ = bucketOf(*std::prev(end)) + 1;
     }
 
-    [[nodiscard]] size_t bucketOf(uint64_t key) const final {
+    [[nodiscard]] size_t bucketOf(uint64_t key) const {
         return pgmIndex.approximate_rank(key);
     }
 
-    void bucketOf(Iterator first, Iterator last, Func f) const final {
+    template<typename Iterator, typename Func>
+    void bucketOf(Iterator first, Iterator last, Func f) const {
         pgmIndex.for_each(first, last, f);
     }
 
-    [[nodiscard]] size_t size() const final {
+    [[nodiscard]] size_t size() const {
         return sizeof(*this) + pgmIndex.size_in_bytes();
     }
 
-    [[nodiscard]] size_t numBuckets() const final {
+    [[nodiscard]] size_t numBuckets() const {
         return numBuckets_;
     }
 
@@ -64,12 +64,10 @@ struct PGMBucketMapper : public BucketMapper {
     }
 
     static std::string name() {
-        return std::string("PgmBucketMapper");
+        return "PGMBucketMapper";
     }
 
     [[nodiscard]] std::string info() const {
         return "epsilon=" + std::to_string(pgmIndex.epsilon_value());
     }
-
-    ~PGMBucketMapper() override = default;
 };

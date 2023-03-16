@@ -1,6 +1,5 @@
 #pragma once
 
-#include "BucketMapper.hpp"
 #include "support/SuccinctPGM.hpp"
 
 /**
