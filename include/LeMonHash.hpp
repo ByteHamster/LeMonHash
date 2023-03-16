@@ -3,8 +3,8 @@
 #include <vector>
 #include <algorithm>
 #include <iostream>
-#include <EliasFano.h>
 #include <Function.h>
+#include "support/sequence/BucketOffsets.hpp"
 #include "support/MultiRetrievalDataStructure.hpp"
 #include "bucket_mapping/LinearBucketMapper.hpp"
 #include "bucket_mapping/PGMBucketMapper.hpp"
@@ -23,7 +23,7 @@ class LeMonHash {
     private:
         BucketMapper bucketMapper;
         MultiRetrievalDataStructure<retrievalCoeffBits> retrievalDataStructure;
-        util::EliasFano<util::floorlog2(std::max(1.0f, BucketMapper::elementsPerBucket()))> bucketSizePrefix;
+        util::BucketOffsets bucketOffsets;
     public:
         static std::string name() {
             return std::string("LeMonHash")
@@ -34,9 +34,8 @@ class LeMonHash {
         explicit LeMonHash(const std::vector<uint64_t> &data)
                 : N(data.size()),
                   bucketMapper(data.begin(), data.end()),
-                  bucketSizePrefix(bucketMapper.numBuckets() + 1, data.size() + 1) {
+                  bucketOffsets(bucketMapper.numBuckets(), data.size()) {
             size_t prevBucket = 0;
-            size_t bucketSizePrefixTemp = 0;
             auto currentBucketBegin = data.begin();
             auto currentBucketEnd = data.begin();
 
@@ -47,8 +46,7 @@ class LeMonHash {
                         retrievalDataStructure.addInput(bucketSize, currentBucketBegin[j], j);
                     }
                 }
-                bucketSizePrefix.push_back(bucketSizePrefixTemp);
-                bucketSizePrefixTemp += bucketSize;
+                bucketOffsets.push(bucketSize);
             };
 
             bucketMapper.bucketOf(data.begin(), data.end(), [&] (auto it, size_t bucket) {
@@ -68,19 +66,13 @@ class LeMonHash {
 
             currentBucketEnd = data.end();
             constructBucket();
-            bucketSizePrefix.push_back(bucketSizePrefixTemp);
-
-            bucketSizePrefix.buildRankSelect();
+            bucketOffsets.done();
 
             retrievalDataStructure.build();
         }
 
         size_t operator()(const uint64_t key) {
-            auto ptr = bucketSizePrefix.at(bucketMapper.bucketOf(key));
-            size_t bucketOffset = *ptr;
-            ++ptr;
-            size_t nextBucketOffset = *ptr;
-            size_t bucketSize = nextBucketOffset - bucketOffset;
+            auto [bucketOffset, bucketSize] = bucketOffsets.at(bucketMapper.bucketOf(key));
             if (bucketSize <= 1) {
                 return bucketOffset;
             } else {
@@ -90,11 +82,11 @@ class LeMonHash {
 
         size_t spaceBits(bool print = true) {
             if (print) {
-                std::cout << "EliasFano:    " << (8.0 * bucketSizePrefix.space() / N) << std::endl;
-                std::cout << "BucketMapper: " << (8.0 * bucketMapper.space() / N) << " (" << bucketMapper.info() << ")" << std::endl;
-                std::cout << "Retrieval:    " << (double(retrievalDataStructure.spaceBits(0)) / N) << std::endl;
+                std::cout << "Retrieval:      " << (double(retrievalDataStructure.spaceBits(0)) / N) << std::endl;
+                std::cout << "Bucket mapper:  " << (8.0 * bucketMapper.space() / N) << " (" << bucketMapper.info() << ")" << std::endl;
+                std::cout << "Bucket offsets: " << (8.0 * bucketOffsets.space() / N) << std::endl;
             }
-            size_t bytes = bucketMapper.space() + sizeof(*this) + bucketSizePrefix.space();
+            size_t bytes = bucketMapper.space() + sizeof(*this) + bucketOffsets.space();
             return 8 * bytes + retrievalDataStructure.spaceBits(0);
         }
 };
