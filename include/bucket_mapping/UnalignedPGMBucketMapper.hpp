@@ -55,7 +55,7 @@ struct UnalignedPGMBucketMapper {
         pgm.for_each(first, last, f);
     }
 
-    [[nodiscard]] size_t size() const {
+    [[nodiscard]] size_t space() const {
         return pgm.size_in_bytes();
     }
 
@@ -68,7 +68,7 @@ struct UnalignedPGMBucketMapper {
     }
 
     static std::string name() {
-        return std::string("UnalignedPgmBucketMapper");
+        return "UnalignedPGMBucketMapper";
     }
 
 };

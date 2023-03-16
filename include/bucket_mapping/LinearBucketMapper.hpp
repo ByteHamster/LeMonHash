@@ -26,7 +26,7 @@ struct LinearBucketMapper {
         }
     }
 
-    [[nodiscard]] size_t size() const {
+    [[nodiscard]] size_t space() const {
         return sizeof(*this);
     }
 

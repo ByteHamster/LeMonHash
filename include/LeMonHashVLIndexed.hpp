@@ -57,11 +57,11 @@ class LeMonHashVLIndexed {
                 return maybe_deref(bucketMapper);
             }
 
-            size_t size() const {
+            size_t space() const {
                 if (directRankStoring)
                     return 0;
                 auto alreadyAccounted = useIndirection ? 0 : sizeof(BucketMapperType);
-                return getBucketMapper().size() - alreadyAccounted;
+                return getBucketMapper().space() - alreadyAccounted;
             }
 
             template<typename RandomIt>
@@ -328,7 +328,7 @@ class LeMonHashVLIndexed {
         size_t spaceBits() {
             std::cout<<"Retrieval:           "<<1.0*retrieval.spaceBits()/N<<std::endl;
             std::cout<<"Bucket mapper:       "<<8.0*std::accumulate(treeNodes.begin(), treeNodes.end(), 0,
-                                                                    [] (size_t size, auto &node) { return size + node.size(); }) / N<<std::endl;
+                                                                    [] (size_t size, auto &node) { return size + node.space(); }) / N<<std::endl;
             std::cout<<"Bucket offsets:      "<<1.0 * std::accumulate(bucketOffsets.begin(), bucketOffsets.end(), 0,
                                                                       [] (size_t size, auto &fano) { return size + fano.bit_size(); }) / N<<std::endl;
             std::cout<<"Tree node data:      "<<(8.0 * (treeNodes.size() * sizeof(TreeNode) + sizeof(Mphf))
@@ -347,7 +347,7 @@ class LeMonHashVLIndexed {
                         + std::accumulate(bucketOffsets.begin(), bucketOffsets.end(), 0,
                                           [] (size_t size, auto &fano) { return size + fano.bit_size(); })
                         + 8 * std::accumulate(treeNodes.begin(), treeNodes.end(), 0,
-                                              [] (size_t size, auto &node) { return size + node.size(); })
+                                              [] (size_t size, auto &node) { return size + node.space(); })
                         + 8 * alphabetMaps.sizeInBytes()
                         + treeNodesMphf.num_bits();
         }

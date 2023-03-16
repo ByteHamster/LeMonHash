@@ -56,7 +56,7 @@ struct PolymorphicPGMBucketMapper {
         pgm.for_each(first, last, f);
     }
 
-    [[nodiscard]] size_t size() const {
+    [[nodiscard]] size_t space() const {
         return pgm.size_in_bytes();
     }
 
@@ -69,7 +69,7 @@ struct PolymorphicPGMBucketMapper {
     }
 
     static std::string name() {
-        return std::string("PolymorphicPgmBucketMapper");
+        return "PolymorphicPGMBucketMapper";
     }
 
 };
