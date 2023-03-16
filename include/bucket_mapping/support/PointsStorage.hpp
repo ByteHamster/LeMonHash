@@ -153,11 +153,9 @@ class EFPointsStorageV2 {
     // ys's universe size in size_bit_width bits
     // epsilon in epsilon_bit_width bits
     // nsegments in nsegments_bit_width bits
-    // encoding size of xs in bit_offset_width bits
-    // encoding size of ys in bit_offset_width bits
     // (nsegments*2+1) yshifts, each in yshift_bit_width(epsilon) bits
-    // xs in Elias-Fano representation
     // ys in Elias-Fano representation
+    // xs in Elias-Fano representation
 
     static constexpr uint8_t key_bit_width = 64;
     static constexpr uint8_t size_bit_width = 32;
@@ -196,7 +194,7 @@ public:
 
         auto yshift_width = yshift_bit_width(epsilon);
         auto total_bit_size = key_bit_width + key_bit_width + size_bit_width + epsilon_bit_width + nsegments_bit_width
-            + yshifts_data.size() * yshift_width + xs_bit_size + ys_bit_size;
+            + yshifts_data.size() * yshift_width + ys_bit_size + xs_bit_size;
 
         succinct::bit_vector_builder bvb;
         bvb.reserve(total_bit_size);
@@ -205,15 +203,14 @@ public:
         bvb.append_bits(first, key_bit_width);
         bvb.append_bits(xs_data.back() + 1, key_bit_width);
         bvb.append_bits(ys_data.back() + 1, size_bit_width);
-        bvb.append_bits(xs_bit_size, size_bit_width);
         bvb.append_bits(epsilon, epsilon_bit_width);
         bvb.append_bits(nsegments, nsegments_bit_width);
 
         for (size_t i = 0; i < yshifts_data.size(); ++i)
             bvb.append_bits(yshifts_data[i], yshift_width);
 
-        bvb.append(xs_bvb);
         ys_type::write(bvb, ys_data.begin(), ys_data.back() + 1, ys_data.size(), ys_params);
+        bvb.append(xs_bvb);
 
         succinct::bit_vector(&bvb).swap(bv);
 
@@ -256,12 +253,12 @@ public:
     [[nodiscard]] size_t size_in_bytes() const { return bv.size() / 8; }
 
     [[nodiscard]] uint8_t epsilon_value() const {
-        auto bit_offset = key_bit_width + key_bit_width + size_bit_width + size_bit_width;
+        auto bit_offset = key_bit_width + key_bit_width + size_bit_width;
         return bv.get_bits(bit_offset, epsilon_bit_width);
     }
 
     [[nodiscard]] size_t segments_count() const {
-        auto bit_offset = key_bit_width + key_bit_width + size_bit_width + size_bit_width + epsilon_bit_width;
+        auto bit_offset = key_bit_width + key_bit_width + size_bit_width + epsilon_bit_width;
         return bv.get_bits(bit_offset, nsegments_bit_width);
     }
 
@@ -326,16 +323,12 @@ private:
     size_t yshifts_size() const { return segments_count() * 2 + 1; }
 
     size_t yshifts_offset() const {
-        return key_bit_width + key_bit_width + size_bit_width + size_bit_width + epsilon_bit_width + nsegments_bit_width;
+        return key_bit_width + key_bit_width + size_bit_width + epsilon_bit_width + nsegments_bit_width;
     }
 
-    size_t xs_offset() const { return yshifts_offset() + yshifts_size() * yshift_bit_width(epsilon_value()); }
+    size_t ys_offset() const { return yshifts_offset() + yshifts_size() * yshift_bit_width(epsilon_value()); }
 
-    size_t ys_offset() const {
-        auto bit_offset = key_bit_width + key_bit_width + size_bit_width;
-        auto xs_size = bv.get_bits(bit_offset, size_bit_width);
-        return xs_offset() + xs_size;
-    }
+    size_t xs_offset() const { return ys_offset() + ys_type::bitsize(ys_params, ys_universe(), ys_size()); }
 
     uint64_t get_yshift(size_t index) const {
         auto bit_offset = yshifts_offset() + index * yshift_bit_width(epsilon_value());
