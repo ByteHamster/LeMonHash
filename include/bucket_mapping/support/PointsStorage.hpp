@@ -25,6 +25,33 @@ struct EFPointsStorage {
 
     EFPointsStorage() = default;
 
+    EFPointsStorage(const EFPointsStorage &) = delete;
+
+    EFPointsStorage(EFPointsStorage &&other) {
+        xs = other.xs;
+        ys = other.ys;
+        yshifts = std::move(other.yshifts);
+        epsilon = other.epsilon;
+        first = other.first;
+        other.xs = nullptr;
+        other.ys = nullptr;
+    }
+
+    EFPointsStorage &operator=(const EFPointsStorage &) = delete;
+
+    EFPointsStorage &operator=(EFPointsStorage &&other) {
+        if (this != &other) {
+            xs = other.xs;
+            ys = other.ys;
+            yshifts = std::move(other.yshifts);
+            epsilon = other.epsilon;
+            first = other.first;
+            other.xs = nullptr;
+            other.ys = nullptr;
+        }
+        return *this;
+    }
+
     void load(uint64_t first, const auto &xs_data, const auto &ys_data, const auto &yshifts_data, uint8_t epsilon) {
         this->first = first;
         this->epsilon = epsilon;
@@ -144,6 +171,20 @@ public:
             ys_params.ef_log_sampling0 = 63; // rank is not needed on the ys
             return true;
         } ();
+    }
+
+    EFPointsStorageV2(const EFPointsStorageV2 &) = delete;
+
+    EFPointsStorageV2(EFPointsStorageV2 &&other) {
+        bv.swap(other.bv);
+    }
+
+    EFPointsStorageV2 &operator=(const EFPointsStorageV2 &) = delete;
+
+    EFPointsStorageV2 &operator=(EFPointsStorageV2 &&other) {
+        if (this != &other)
+            bv.swap(other.bv);
+        return *this;
     }
 
     void load(uint64_t first, const auto &xs_data, const auto &ys_data, const auto &yshifts_data, uint8_t epsilon) {
@@ -339,6 +380,23 @@ class EFSequentialPointsStorage {
 public:
 
     EFSequentialPointsStorage() = default;
+
+    EFSequentialPointsStorage(const EFSequentialPointsStorage &) = delete;
+
+    EFSequentialPointsStorage(EFSequentialPointsStorage &&other) {
+        data = other.data;
+        other.data = nullptr;
+    }
+
+    EFSequentialPointsStorage &operator=(const EFSequentialPointsStorage &) = delete;
+
+    EFSequentialPointsStorage &operator=(EFSequentialPointsStorage &&other) {
+        if (this != &other) {
+            data = other.data;
+            other.data = nullptr;
+        }
+        return *this;
+    }
 
     void load(uint64_t first, const auto &xs_data, auto &ys_data, const auto &yshifts_data, uint8_t epsilon) {
         for (size_t i = 0; i < ys_data.size(); ++i)

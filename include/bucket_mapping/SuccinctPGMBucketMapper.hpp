@@ -6,8 +6,7 @@
  * Uses a succinct version of the PGM Index to get an approximate rank, which we use as bucket index.
  */
 struct SuccinctPGMBucketMapper {
-    using type = pgm::SuccinctPGMIndex<>;
-    type *pgm = nullptr;
+    pgm::SuccinctPGMIndex<> pgm;
 
     SuccinctPGMBucketMapper() = default;
 
@@ -29,43 +28,40 @@ struct SuccinctPGMBucketMapper {
 
         // Evaluate PGM
         for (auto epsilon : {63, 31, 15}) {
-            auto *p = new type(begin, end, epsilon);
+            decltype(pgm) p(begin, end, epsilon);
 
-            cost = p->size_in_bytes() * 8;
+            cost = p.size_in_bytes() * 8;
             if (cost >= bestCost) {
                 // If PGM alone already is larger, additional epsilon parameters will be larger as well.
                 break;
             }
             previousBucket = 0;
             bucketBegin = begin;
-            p->for_each(begin, end, updateCost);
+            p.for_each(begin, end, updateCost);
             updateCost(end, std::numeric_limits<uint64_t>::max());
 
             if (cost < bestCost) {
-                delete pgm;
-                pgm = p;
+                pgm = std::move(p);
                 bestCost = cost;
-            } else {
-                delete p;
             }
         }
     }
 
     [[nodiscard]] size_t bucketOf(uint64_t key) const  {
-       return pgm->approximate_rank(key);
+       return pgm.approximate_rank(key);
     }
 
     template<typename Iterator, typename Func>
     void bucketOf(Iterator first, Iterator last, Func f) const {
-        pgm->for_each(first, last, f);
+        pgm.for_each(first, last, f);
     }
 
     [[nodiscard]] size_t size() const {
-        return sizeof(*this) + pgm->size_in_bytes();
+        return pgm.size_in_bytes();
     }
 
     [[nodiscard]] size_t numBuckets() const {
-        return pgm->size();
+        return pgm.size();
     }
 
     [[nodiscard]] constexpr static float elementsPerBucket() {
@@ -73,14 +69,10 @@ struct SuccinctPGMBucketMapper {
     }
 
     static std::string name() {
-        return std::string("SuccinctPgmBucketMapper");
+        return "SuccinctPGMBucketMapper";
     }
 
     [[nodiscard]] std::string info() const {
-        return "epsilon=" + std::to_string(pgm->epsilon_value());
-    }
-
-    ~SuccinctPGMBucketMapper() {
-        delete pgm;
+        return "epsilon=" + std::to_string(pgm.epsilon_value());
     }
 };
