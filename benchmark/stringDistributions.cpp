@@ -44,14 +44,17 @@ std::vector<std::string> loadFile(std::string &filename, size_t maxStrings) {
     const int MAX_LENGTH = 524288;
     char* line = new char[MAX_LENGTH];
     while (stream.getline(line, MAX_LENGTH)) {
+        if (!inputData.empty()) {
+            if (strcmp(inputData.back().c_str(), line) > 0) {
+                throw std::runtime_error("Not sorted or duplicate key");
+            }
+        }
         inputData.emplace_back(line);
         if (inputData.size() >= maxStrings) {
             break;
         }
     }
     delete[] line;
-    std::cout<<"Sorting input data"<<std::endl;
-    std::sort(inputData.begin(), inputData.end());
     std::cout<<"Loaded "<<inputData.size()<<" strings"<<std::endl;
     return inputData;
 }

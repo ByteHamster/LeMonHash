@@ -14,7 +14,12 @@ std::vector<uint64_t> loadIntegerFile(std::string &filename, size_t maxN) {
     std::vector<uint64_t> inputData(size);
     fileIn.read(reinterpret_cast<char *>(inputData.data()), size * sizeof(uint64_t));
     fileIn.close();
-    std::cout<<"Sorting input data"<<std::endl;
+    std::cout<<"Checking if input data is sorted"<<std::endl;
+    for (size_t i = 1; i < inputData.size(); i++) {
+        if (inputData.at(i) < inputData.at(i - 1)) {
+            throw std::runtime_error("Not sorted or duplicate key");
+        }
+    }
     std::sort(inputData.begin(), inputData.end());
     std::cout<<"Loaded "<<inputData.size()<<" integers"<<std::endl;
     return inputData;
