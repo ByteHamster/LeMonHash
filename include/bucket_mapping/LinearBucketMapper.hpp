@@ -34,12 +34,8 @@ struct LinearBucketMapper {
         return numBuckets_;
     }
 
-    [[nodiscard]] constexpr static float elementsPerBucket() {
-        return elsPerBucket;
-    }
-
     static std::string name() {
-        return "LinearBucketMapper elementsPerBucket=" + std::to_string(elementsPerBucket());
+        return "LinearBucketMapper elementsPerBucket=" + std::to_string(elsPerBucket);
     }
 
     [[nodiscard]] std::string info() const {

@@ -59,10 +59,6 @@ struct PGMBucketMapper {
         return numBuckets_;
     }
 
-    [[nodiscard]] constexpr static float elementsPerBucket() {
-        return 1.0;
-    }
-
     static std::string name() {
         return "PGMBucketMapper";
     }

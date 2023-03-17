@@ -64,10 +64,6 @@ struct SuccinctPGMBucketMapper {
         return pgm.size();
     }
 
-    [[nodiscard]] constexpr static float elementsPerBucket() {
-        return 1.0;
-    }
-
     static std::string name() {
         return "SuccinctPGMBucketMapper";
     }
