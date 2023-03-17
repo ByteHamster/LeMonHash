@@ -65,3 +65,22 @@ auto distinctMinima(const auto begin, const auto end, size_t k, auto lowerBound)
     std::copy(s.begin(), s.end(), std::back_inserter(result));
     return result;
 }
+
+/** Finds the next set bit after a given position. */
+static uint64_t nextOne(size_t i, const uint64_t *data) {
+    auto wordIdx = i / 64;
+    auto word = data[wordIdx] & sdsl::bits::lo_unset[i % 64];
+    word &= word - 1;
+    while (word == 0)
+        word = data[++wordIdx];
+    return wordIdx * 64 + __builtin_ctzll(word);
+}
+
+/** Finds the previous set bit before a given position. */
+static uint64_t prevOne(size_t i, const uint64_t *data) {
+    auto wordIdx = i / 64;
+    auto word = data[wordIdx] & sdsl::bits::lo_set[i % 64];
+    while (word == 0)
+        word = data[--wordIdx];
+    return wordIdx * 64 + 63 - __builtin_clzll(word);
+}

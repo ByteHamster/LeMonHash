@@ -2,9 +2,9 @@
 
 #include <cassert>
 #include <utility>
-#include <include/pasta/bit_vector/bit_vector.hpp>
-#include <include/pasta/bit_vector/support/flat_rank_select.hpp>
-#include "EliasFanoModified.hpp"
+#include <pasta/bit_vector/bit_vector.hpp>
+#include <pasta/bit_vector/support/flat_rank_select.hpp>
+#include "support/util.h"
 
 namespace util {
 

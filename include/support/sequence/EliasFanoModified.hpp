@@ -3,8 +3,9 @@
 #include <vector>
 #include <cassert>
 #include <sdsl/bit_vectors.hpp>
-#include <include/pasta/bit_vector/bit_vector.hpp>
-#include <include/pasta/bit_vector/support/flat_rank_select.hpp>
+#include <pasta/bit_vector/bit_vector.hpp>
+#include <pasta/bit_vector/support/flat_rank_select.hpp>
+#include "support/util.h"
 
 namespace util {
 
@@ -25,25 +26,6 @@ static uint8_t elias_fano_lo_width(size_t universe, size_t ones) {
         low_width = (uint8_t) std::round(std::max(ideal_width, 1.0));
     }
     return low_width;
-}
-
-/** Finds the next set bit after a given position. */
-static uint64_t nextOne(size_t i, const uint64_t *data) {
-    auto wordIdx = i / 64;
-    auto word = data[wordIdx] & sdsl::bits::lo_unset[i % 64];
-    word &= word - 1;
-    while (word == 0)
-        word = data[++wordIdx];
-    return wordIdx * 64 + __builtin_ctzll(word);
-}
-
-/** Finds the previous set bit before a given position. */
-static uint64_t prevOne(size_t i, const uint64_t *data) {
-    auto wordIdx = i / 64;
-    auto word = data[wordIdx] & sdsl::bits::lo_set[i % 64];
-    while (word == 0)
-        word = data[--wordIdx];
-    return wordIdx * 64 + 63 - __builtin_clzll(word);
 }
 
 /**
