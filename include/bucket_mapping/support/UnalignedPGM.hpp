@@ -14,7 +14,7 @@
 #include <cassert>
 #include <vector>
 
-namespace pgm {
+namespace lemonhash::pgm {
 
 /**
  * Variant of the PGM that stores its data in an uncompressed bit vector.

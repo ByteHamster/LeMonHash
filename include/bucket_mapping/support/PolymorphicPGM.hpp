@@ -14,7 +14,7 @@
 #include <utility>
 #include <vector>
 
-namespace pgm {
+namespace lemonhash::pgm {
 
 /**
  * Variant of the PGM that either stores its data uncompressed or compressed, depending on whether compression is

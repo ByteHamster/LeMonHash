@@ -7,7 +7,7 @@
 #include "support/sequence/EliasFanoModified.hpp"
 #include "PointsStorage.hpp"
 
-namespace pgm {
+namespace lemonhash::pgm {
 
 #pragma pack(push, 1)
 template<typename PointsStorage = EFPointsStorage>

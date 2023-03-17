@@ -28,7 +28,7 @@
 #define PGM_SUB_EPS(x, epsilon) ((x) <= (epsilon) ? 0 : ((x) - (epsilon)))
 #define PGM_ADD_EPS(x, epsilon, size) ((x) + (epsilon) + 2 >= (size) ? (size) : (x) + (epsilon) + 2)
 
-namespace pgm {
+namespace lemonhash::pgm {
 
 /**
  * A space-efficient index that enables fast search operations on a sorted sequence of @c n numbers.

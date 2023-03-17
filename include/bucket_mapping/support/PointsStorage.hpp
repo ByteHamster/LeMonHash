@@ -7,7 +7,7 @@
 #include <partitioned_sequence.hpp>
 #include <uniform_partitioned_sequence.hpp>
 
-namespace pgm {
+namespace lemonhash::pgm {
 
 #pragma pack(push, 1)
 

@@ -26,7 +26,7 @@
 #include <utility>
 #include <vector>
 
-namespace pgm::internal {
+namespace lemonhash::pgm::internal {
 
 template<typename T>
 using LargeSigned = typename std::conditional_t<std::is_floating_point_v<T>,
@@ -318,7 +318,7 @@ size_t make_segmentation_mod(size_t n, size_t epsilon, Fin in, Fout out, bool co
 
 }
 
-namespace pgm {
+namespace lemonhash::pgm {
 
 struct Segment {
     using K = uint64_t;
