@@ -10,6 +10,7 @@
 #include "bucket_mapping/PGMBucketMapper.hpp"
 #include "bucket_mapping/SuccinctPGMBucketMapper.hpp"
 
+namespace lemonhash {
 /**
  * Learned Monotone Minimal Perfect Hash Function (MMPHF).
  * Each object is mapped to a bucket using the PGM index.
@@ -23,7 +24,7 @@ class LeMonHash {
     private:
         BucketMapper bucketMapper;
         MultiRetrievalDataStructure<retrievalCoeffBits> retrievalDataStructure;
-        util::BucketOffsets bucketOffsets;
+        BucketOffsets bucketOffsets;
     public:
         static std::string name() {
             return std::string("LeMonHash")
@@ -90,3 +91,4 @@ class LeMonHash {
             return 8 * bytes + retrievalDataStructure.spaceBits(0);
         }
 };
+} // namespace lemonhash

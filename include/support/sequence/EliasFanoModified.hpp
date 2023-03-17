@@ -7,7 +7,7 @@
 #include <pasta/bit_vector/support/flat_rank_select.hpp>
 #include "support/util.h"
 
-namespace util {
+namespace lemonhash {
 
 // Returns the width of the integers stored in the low part of an Elias-Fano-coded sequence.
 //
@@ -364,4 +364,4 @@ struct SequentialEliasFano {
     };
 };
 
-} // Namespace util
+} // namespace lemonhash

@@ -2,6 +2,7 @@
 #include <vector>
 #include "AlphabetMap.h"
 
+namespace lemonhash {
 class AlphabetMapsCollection {
         std::vector<AlphabetMap<true>> maps7;
         std::vector<AlphabetMap<false>> maps8;
@@ -72,3 +73,4 @@ class AlphabetMapsCollection {
             maps8.shrink_to_fit();
         }
 };
+} // namespace lemonhash

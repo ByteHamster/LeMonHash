@@ -1,5 +1,6 @@
 #pragma once
 
+namespace lemonhash {
 class TreePath {
     private:
         uint64_t hash = 88172645463325252ull;
@@ -22,3 +23,4 @@ class TreePath {
             return util::remix(hash + 378368305212772073ul);
         }
 };
+} // namespace lemonhash

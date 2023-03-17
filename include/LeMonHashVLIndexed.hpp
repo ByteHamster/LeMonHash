@@ -2,6 +2,7 @@
 
 #include "LeMonHashVL.hpp"
 
+namespace lemonhash {
 class LeMonHashVLIndexed {
     private:
         static constexpr size_t DIRECT_RANK_STORING_THRESHOLD = 128;
@@ -425,3 +426,4 @@ class LeMonHashVLIndexed {
             }
         }
 };
+} // namespace lemonhash

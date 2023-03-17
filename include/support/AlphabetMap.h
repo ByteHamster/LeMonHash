@@ -7,6 +7,7 @@
 #include <numeric>
 #include "util.h"
 
+namespace lemonhash {
 /** Stores a subset of the alphabet of 7-bit or 8-bit values (depending on whether ASCII is true). */
 template<bool ASCII=false>
 struct AlphabetMap {
@@ -182,3 +183,4 @@ struct AlphabetMap {
                 std::cout<<line<<std::endl;*/
         }
 };
+} // namespace lemonhash

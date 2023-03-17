@@ -1,5 +1,6 @@
 #pragma once
 
+namespace lemonhash {
 /**
  * Each object is mapped linearly to its bucket. This only works well for uniform distributed inputs.
  */
@@ -42,3 +43,4 @@ struct LinearBucketMapper {
         return "numBuckets=" + std::to_string(numBuckets_) + " u=" + std::to_string(u);
     }
 };
+} // namespace lemonhash

@@ -5,6 +5,7 @@
 #include <strict_sequence.hpp>
 #include <vector>
 
+namespace lemonhash {
 class DuplicatesAwareEliasFano {
     struct InputData {
         std::vector<size_t> distinct;
@@ -113,3 +114,4 @@ public:
         delete input;
     }
 };
+} // namespace lemonhash

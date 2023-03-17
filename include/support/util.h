@@ -7,6 +7,7 @@
 #include <bit>
 #include <set>
 
+namespace lemonhash {
 struct LcpDetails {
     uint32_t lcp;
     char branchingCharacter0;
@@ -84,3 +85,4 @@ static uint64_t prevOne(size_t i, const uint64_t *data) {
         word = data[--wordIdx];
     return wordIdx * 64 + 63 - __builtin_clzll(word);
 }
+} // namespace lemonhash

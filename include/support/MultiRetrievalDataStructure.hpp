@@ -4,6 +4,7 @@
 #include "MurmurHash64.h"
 #include "support/util.h"
 
+namespace lemonhash {
 /**
  * Container with multiple retrieval data structures of different sizes.
  * Can be indexed by specifying the *range* of the values to store/query.
@@ -131,3 +132,4 @@ class MultiRetrievalDataStructure {
             return (bytes + sizeof(*this)) * 8;
         }
 };
+} // namespace lemonhash

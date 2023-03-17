@@ -5,6 +5,7 @@
 #include <strict_sequence.hpp>
 #include <vector>
 
+namespace lemonhash {
 /**
  * Stores a monotonic list of integers using Elias-Fano coding.
  * Uses a partitioned Elias-Fano implementation that optimizes irregularities.
@@ -62,3 +63,4 @@ class PartitionedEliasFano {
             return bv.size() + 8 * sizeof(*this);
         }
 };
+} // namespace lemonhash

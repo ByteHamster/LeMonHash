@@ -6,6 +6,7 @@
 #include <pasta/bit_vector/support/flat_rank_select.hpp>
 #include "support/sequence/EliasFanoModified.hpp"
 
+namespace lemonhash {
 /**
  * Stores a monotonic list of integers.
  * Filters out runs of repeated same values using rank/select.
@@ -122,9 +123,9 @@ class DuplicateFilterRunlength {
         size_t duplicatesOfPreviousValue = 0;
         ChildSequence child;
         std::vector<size_t> duplicateRunsStart;
-        util::EliasFanoM *duplicateRunsStartEf = nullptr;
+        EliasFanoM *duplicateRunsStartEf = nullptr;
         std::vector<size_t> duplicateRunsLengthPrefix;
-        util::EliasFanoM *duplicateRunsLengthPrefixEf = nullptr;
+        EliasFanoM *duplicateRunsLengthPrefixEf = nullptr;
         size_t duplicateRunsLengthPrefixTmp = 0;
     public:
         DuplicateFilterRunlength() = default;
@@ -182,7 +183,7 @@ class DuplicateFilterRunlength {
             duplicateRunsStart.push_back(n);
             duplicateRunsLengthPrefix.push_back(duplicateRunsLengthPrefixTmp);
 
-            duplicateRunsStartEf = new util::EliasFanoM(duplicateRunsStart.size(),
+            duplicateRunsStartEf = new EliasFanoM(duplicateRunsStart.size(),
                                duplicateRunsStart.back() + 1);
             for (size_t i = 0; i < duplicateRunsStart.size(); i++) {
                 duplicateRunsStartEf->push_back(duplicateRunsStart.at(i));
@@ -191,7 +192,7 @@ class DuplicateFilterRunlength {
             duplicateRunsStart.resize(0);
             duplicateRunsStart.shrink_to_fit();
 
-            duplicateRunsLengthPrefixEf = new util::EliasFanoM(duplicateRunsLengthPrefix.size(),
+            duplicateRunsLengthPrefixEf = new EliasFanoM(duplicateRunsLengthPrefix.size(),
                                 duplicateRunsLengthPrefix.back() - (duplicateRunsLengthPrefix.size() - 1) * MIN_DUPLICATES + 1);
             for (size_t i = 0; i < duplicateRunsLengthPrefix.size(); i++) {
                 duplicateRunsLengthPrefixEf->push_back(duplicateRunsLengthPrefix.at(i) - i * MIN_DUPLICATES);
@@ -231,3 +232,4 @@ class DuplicateFilterRunlength {
                    + child.bit_size();
         }
 };
+} // namespace lemonhash

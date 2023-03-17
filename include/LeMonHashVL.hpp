@@ -19,6 +19,7 @@
 #include "support/AlphabetMapsCollection.h"
 #include "LeMonHash.hpp"
 
+namespace lemonhash {
 using BucketMapperType = UnalignedPGMBucketMapper;
 
 template <typename T>
@@ -430,3 +431,4 @@ class LeMonHashVL {
             }
         }
 };
+} // namespace lemonhash

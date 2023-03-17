@@ -6,7 +6,7 @@
 #include <pasta/bit_vector/support/flat_rank_select.hpp>
 #include "support/util.h"
 
-namespace util {
+namespace lemonhash {
 
 /** A randomly-accessible sequence of bucket offsets/sizes. */
 class BucketOffsets {
@@ -47,4 +47,4 @@ public:
     }
 };
 
-} // namespace util
+} // namespace lemonhash

@@ -3,6 +3,7 @@
 #include "support/PGM.hpp"
 #include <bit>
 
+namespace lemonhash {
 /**
  * Uses the PGM Index to get an approximate rank, which we use as bucket index.
  * Has small space overhead for uniform distribution, but enables using other distributions.
@@ -67,3 +68,4 @@ struct PGMBucketMapper {
         return "epsilon=" + std::to_string(pgmIndex.epsilon_value());
     }
 };
+} // namespace lemonhash

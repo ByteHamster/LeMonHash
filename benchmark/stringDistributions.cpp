@@ -81,8 +81,8 @@ int main(int argc, char** argv) {
 
     size_t positionOfSlash = filename.find_last_of('/');
     std::string baseFilename = positionOfSlash == std::string::npos ? filename : filename.substr(positionOfSlash + 1);
-    simpleMmphfBenchmark<LeMonHashVL>(inputData, baseFilename);
-    simpleMmphfBenchmark<LeMonHashVLIndexed>(inputData, baseFilename);
+    simpleMmphfBenchmark<lemonhash::LeMonHashVL>(inputData, baseFilename);
+    simpleMmphfBenchmark<lemonhash::LeMonHashVLIndexed>(inputData, baseFilename);
 
     return 0;
 }

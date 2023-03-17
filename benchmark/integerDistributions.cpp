@@ -89,7 +89,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    simpleMmphfBenchmark<LeMonHash<SuccinctPGMBucketMapper>>(inputData, datasetName);
+    simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::SuccinctPGMBucketMapper>>(inputData, datasetName);
 
     std::vector<std::string> inputAsString;
     inputAsString.reserve(inputData.size());
@@ -97,7 +97,7 @@ int main(int argc, char** argv) {
         uint64_t swapped = __builtin_bswap64(x);
         inputAsString.emplace_back((char*) &swapped, sizeof(uint64_t));
     }
-    simpleMmphfBenchmark<LeMonHashVL>(inputAsString, datasetName);
+    simpleMmphfBenchmark<lemonhash::LeMonHashVL>(inputAsString, datasetName);
 
     return 0;
 }

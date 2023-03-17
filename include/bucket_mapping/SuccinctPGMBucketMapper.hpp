@@ -2,6 +2,7 @@
 
 #include "support/SuccinctPGM.hpp"
 
+namespace lemonhash {
 /**
  * Uses a succinct version of the PGM Index to get an approximate rank, which we use as bucket index.
  */
@@ -72,3 +73,4 @@ struct SuccinctPGMBucketMapper {
         return "epsilon=" + std::to_string(pgm.epsilon_value());
     }
 };
+} // namespace lemonhash

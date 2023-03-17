@@ -2,6 +2,7 @@
 
 #include "support/UnalignedPGM.hpp"
 
+namespace lemonhash {
 /**
  * Uses a PGM-index to get an approximate rank, which we use as bucket index.
  */
@@ -76,3 +77,4 @@ struct UnalignedPGMBucketMapper {
     }
 
 };
+} // namespace lemonhash

@@ -3,6 +3,7 @@
 #include "support/PolymorphicPGM.hpp"
 #include <bit>
 
+namespace lemonhash {
 /**
  * Uses a PGM-index to get an approximate rank, which we use as bucket index.
  */
@@ -77,3 +78,4 @@ struct PolymorphicPGMBucketMapper {
     }
 
 };
+} // namespace lemonhash

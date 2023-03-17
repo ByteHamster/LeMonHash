@@ -15,8 +15,8 @@ uint8_t yshift_bit_width(uint8_t epsilon) { return sdsl::bits::hi(2 * epsilon) +
 
 /** Store points using Elias-Fano representations with support for random access. */
 struct EFPointsStorage {
-    using xs_type = util::EliasFanoM;
-    using ys_type = util::EliasFanoM;
+    using xs_type = lemonhash::EliasFanoM;
+    using ys_type = lemonhash::EliasFanoM;
     xs_type *xs;
     ys_type *ys;
     sdsl::int_vector<> yshifts;
@@ -363,7 +363,7 @@ class EFSequentialPointsStorage {
     // xs in Elias-Fano representation
     // ys in Elias-Fano representation
 
-    using EFIterator = util::SequentialEliasFano::Iterator;
+    using EFIterator = lemonhash::SequentialEliasFano::Iterator;
 
     static constexpr uint8_t key_bit_width = 64;
     static constexpr uint8_t epsilon_bit_width = 8;
@@ -394,8 +394,8 @@ public:
     void load(uint64_t first, const auto &xs_data, auto &ys_data, const auto &yshifts_data, uint8_t epsilon) {
         for (size_t i = 0; i < ys_data.size(); ++i)
             ys_data[i] -= i;
-        auto xs_bit_size = util::SequentialEliasFano::encodingSize(xs_data);
-        auto ys_bit_size = util::SequentialEliasFano::encodingSize(ys_data);
+        auto xs_bit_size = lemonhash::SequentialEliasFano::encodingSize(xs_data);
+        auto ys_bit_size = lemonhash::SequentialEliasFano::encodingSize(ys_data);
 
         auto yshift_width = yshift_bit_width(epsilon);
         auto total_bit_size = key_bit_width + epsilon_bit_width + nsegments_bit_width + bit_offset_width +
@@ -422,8 +422,8 @@ public:
 
         assert(size_t(ptr - data) * 64 + word_offset == xs_offset());
         assert(size_t(ptr - data) * 64 + word_offset + xs_bit_size == ys_offset());
-        util::SequentialEliasFano::write(data, (ptr - data) * 64 + word_offset, xs_data);
-        util::SequentialEliasFano::write(data, (ptr - data) * 64 + word_offset + xs_bit_size, ys_data);
+        lemonhash::SequentialEliasFano::write(data, (ptr - data) * 64 + word_offset, xs_data);
+        lemonhash::SequentialEliasFano::write(data, (ptr - data) * 64 + word_offset + xs_bit_size, ys_data);
         assert(size_in_bytes() / sizeof(uint64_t) == (total_bit_size + 63) / 64);
     }
 
