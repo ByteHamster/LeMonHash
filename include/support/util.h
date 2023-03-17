@@ -5,6 +5,7 @@
 #include <unordered_set>
 #include <algorithm>
 #include <bit>
+#include <sdsl/bits.hpp>
 #include <set>
 
 namespace lemonhash {
