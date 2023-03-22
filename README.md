@@ -1,6 +1,6 @@
 # Learned Monotone Minimal Perfect Hashing
 
-<img src="https://raw.githubusercontent.com/ByteHamster/DirectRankStoring/main/lemon_wordmark.svg" width="300" alt="Logo">
+<img src="lemon_wordmark.svg" width="400" alt="Logo">
 
 LeMonHash is a Monotone Minimal Perfect Hash function that combines
 the [PGM-Index](https://github.com/gvinciguerra/PGM-index) for space-efficient ranking
@@ -8,7 +8,7 @@ and [BuRR](https://github.com/lorenzhs/BuRR) for low-overhead retrieval.
 
 A variant for variable-length strings provides significantly faster queries than competitors.
 
-<img src="https://raw.githubusercontent.com/ByteHamster/DirectRankStoring/main/plots.png" alt="Screenshot of measurements in paper">
+<img src="plots.png" alt="Screenshot of measurements in paper">
 
 ### Requirements
 
