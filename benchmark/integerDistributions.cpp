@@ -6,13 +6,13 @@
 #include <bucket_mapping/SegmentedLinearBucketMapper.hpp>
 #include "simpleMmphfBenchmark.hpp"
 
-std::vector<uint64_t> loadIntegerFile(std::string &filename, size_t maxN) {
-    std::cout<<"Loading input file"<<std::endl;
+std::vector<uint64_t> loadInt64File(std::string &filename, size_t maxN) {
     std::ifstream fileIn(filename, std::ios::in | std::ios::binary);
     if (!fileIn) throw std::system_error(errno, std::system_category(), "failed to open " + filename);
     size_t size = 0;
     fileIn.read(reinterpret_cast<char *>(&size), sizeof(size_t));
     size = std::min(size, maxN);
+    std::cout<<"Loading input file of size "<<size<<std::endl;
     std::vector<uint64_t> inputData(size);
     fileIn.read(reinterpret_cast<char *>(inputData.data()), size * sizeof(uint64_t));
     fileIn.close();
@@ -22,9 +22,31 @@ std::vector<uint64_t> loadIntegerFile(std::string &filename, size_t maxN) {
             throw std::runtime_error("Not sorted or duplicate key");
         }
     }
-    std::sort(inputData.begin(), inputData.end());
     std::cout<<"Loaded "<<inputData.size()<<" integers"<<std::endl;
     return inputData;
+}
+
+std::vector<uint64_t> loadInt32File(std::string &filename, size_t maxN) {
+    std::ifstream fileIn(filename, std::ios::in | std::ios::binary);
+    if (!fileIn) throw std::system_error(errno, std::system_category(), "failed to open " + filename);
+    uint32_t size = 0;
+    fileIn.read(reinterpret_cast<char *>(&size), sizeof(uint32_t));
+    size = std::min<uint32_t>(size, maxN);
+    std::cout<<"Loading input file of size "<<size<<std::endl;
+    std::vector<uint32_t> inputData(size);
+    fileIn.read(reinterpret_cast<char *>(inputData.data()), size * sizeof(uint32_t));
+    fileIn.close();
+    std::cout<<"Loaded "<<inputData.size()<<" integers"<<std::endl;
+    std::cout<<"Converting to uint64"<<std::endl;
+    std::vector<uint64_t> inputDataConverted;
+    inputDataConverted.reserve(size);
+    for (size_t i = 0; i < inputData.size(); i++) {
+        inputDataConverted.push_back(inputData.at(i));
+        if (i > 0 && inputData.at(i) <= inputData.at(i - 1)) {
+            throw std::runtime_error("Not sorted or duplicate key");
+        }
+    }
+    return inputDataConverted;
 }
 
 std::vector<uint64_t> randomUniform(size_t n, uint64_t u) {
@@ -68,13 +90,13 @@ std::vector<uint64_t> randomPareto(size_t n, double shape = 1.1) {
 int main(int argc, char** argv) {
     size_t N = std::numeric_limits<size_t>::max();
     std::string filename;
-    std::string type = "uniform";
+    std::string type = "int64";
     std::string datasetName = "";
     size_t numQueries = 1e6;
 
     tlx::CmdlineParser cmd;
     cmd.add_bytes('n', "num_keys", N, "Number of keys to generate");
-    cmd.add_string('t', "type", type, "Type of data to generate (uniform or pareto)");
+    cmd.add_string('t', "type", type, "Type of data to generate (uniform, pareto, int32, int64)");
     cmd.add_string('f', "filename", filename, "Input data set to load. First 64 bits must be length, then all following words are integers");
     cmd.add_bytes('q', "numQueries", numQueries, "Number of queries to measure");
     if (!cmd.process(argc, argv)) {
@@ -84,7 +106,14 @@ int main(int argc, char** argv) {
     std::cout<<"Generating input data"<<std::endl;
     std::vector<uint64_t> inputData;
     if (!filename.empty()) {
-        inputData = loadIntegerFile(filename, N);
+        if (type == "int32") {
+            inputData = loadInt32File(filename, N);
+        } else if (type == "int64") {
+            inputData = loadInt64File(filename, N);
+        } else {
+            cmd.print_usage();
+            return 1;
+        }
         size_t positionOfSlash = filename.find_last_of('/');
         datasetName = positionOfSlash == std::string::npos ? filename : filename.substr(positionOfSlash + 1);
     } else if (type == "pareto") {
