@@ -93,14 +93,25 @@ int main(int argc, char** argv) {
     std::string type = "int64";
     std::string datasetName = "";
     size_t numQueries = 1e6;
+    bool linear = false;
+    bool segmented = false;
+    bool succinctPgm = false;
+    bool leMonVl = false;
 
     tlx::CmdlineParser cmd;
     cmd.add_bytes('n', "num_keys", N, "Number of keys to generate");
     cmd.add_string('t', "type", type, "Type of data to generate (uniform, pareto, int32, int64)");
     cmd.add_string('f', "filename", filename, "Input data set to load. First 64 bits must be length, then all following words are integers");
     cmd.add_bytes('q', "numQueries", numQueries, "Number of queries to measure");
+    cmd.add_flag("linear", linear, "Run with linear bucket mapper");
+    cmd.add_flag("segmented", segmented, "Run with segmented bucket mapper");
+    cmd.add_flag("succinctPgm", succinctPgm, "Run with succinctPgm bucket mapper");
+    cmd.add_flag("leMonVl", leMonVl, "Run with leMonVl bucket mapper");
     if (!cmd.process(argc, argv)) {
         return 1;
+    }
+    if (!linear && !segmented && !succinctPgm && !leMonVl) {
+        succinctPgm = true;
     }
 
     std::cout<<"Generating input data"<<std::endl;
@@ -127,21 +138,27 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::LinearBucketMapper>>(inputData, datasetName, numQueries);
-    simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::SegmentedLinearBucketMapper<32>>>(inputData, datasetName, numQueries);
-    simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::SegmentedLinearBucketMapper<64>>>(inputData, datasetName, numQueries);
-    simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::SegmentedLinearBucketMapper<128>>>(inputData, datasetName, numQueries);
-    simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::SegmentedLinearBucketMapper<256>>>(inputData, datasetName, numQueries);
-    simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::SegmentedLinearBucketMapper<512>>>(inputData, datasetName, numQueries);
-    simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::SuccinctPGMBucketMapper>>(inputData, datasetName, numQueries);
-
-    std::vector<std::string> inputAsString;
-    inputAsString.reserve(inputData.size());
-    for (uint64_t x : inputData) {
-        uint64_t swapped = __builtin_bswap64(x);
-        inputAsString.emplace_back((char*) &swapped, sizeof(uint64_t));
+    if (linear) {
+        simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::LinearBucketMapper>>(inputData, datasetName, numQueries);
     }
-    simpleMmphfBenchmark<lemonhash::LeMonHashVL>(inputAsString, datasetName, numQueries);
-
+    if (segmented) {
+        simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::SegmentedLinearBucketMapper<32>>>(inputData, datasetName, numQueries);
+        simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::SegmentedLinearBucketMapper<64>>>(inputData, datasetName, numQueries);
+        simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::SegmentedLinearBucketMapper<128>>>(inputData, datasetName, numQueries);
+        simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::SegmentedLinearBucketMapper<256>>>(inputData, datasetName, numQueries);
+        simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::SegmentedLinearBucketMapper<512>>>(inputData, datasetName, numQueries);
+    }
+    if (succinctPgm) {
+        simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::SuccinctPGMBucketMapper>>(inputData, datasetName, numQueries);
+    }
+    if (leMonVl) {
+        std::vector<std::string> inputAsString;
+        inputAsString.reserve(inputData.size());
+        for (uint64_t x : inputData) {
+            uint64_t swapped = __builtin_bswap64(x);
+            inputAsString.emplace_back((char*) &swapped, sizeof(uint64_t));
+        }
+        simpleMmphfBenchmark<lemonhash::LeMonHashVL>(inputAsString, datasetName, numQueries);
+    }
     return 0;
 }
