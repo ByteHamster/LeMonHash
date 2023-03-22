@@ -7,16 +7,16 @@ namespace lemonhash {
 struct LinearBucketMapper {
     static constexpr float elsPerBucket = 1.0f;
     size_t numBuckets_;
-    uint64_t u;
+    uint64_t divisor;
 
     template<typename RandomIt>
     LinearBucketMapper(RandomIt begin, RandomIt end)
             : numBuckets_((end - begin) / elsPerBucket),
-              u(*std::prev(end)) {
+              divisor(*std::prev(end) / (numBuckets_ - 1)) {
     }
 
     [[nodiscard]] size_t bucketOf(uint64_t key) const {
-        return std::min(numBuckets_ - 1, key / (u / (numBuckets_ - 1)));
+        return std::min(numBuckets_ - 1, key / divisor);
     }
 
     template<typename Iterator, typename Func>
@@ -40,7 +40,7 @@ struct LinearBucketMapper {
     }
 
     [[nodiscard]] std::string info() const {
-        return "numBuckets=" + std::to_string(numBuckets_) + " u=" + std::to_string(u);
+        return "numBuckets=" + std::to_string(numBuckets_) + " u=" + std::to_string(divisor * (numBuckets_ - 1));
     }
 };
 } // namespace lemonhash
