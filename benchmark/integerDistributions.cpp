@@ -128,9 +128,11 @@ int main(int argc, char** argv) {
     }
 
     simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::LinearBucketMapper>>(inputData, datasetName, numQueries);
+    simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::SegmentedLinearBucketMapper<32>>>(inputData, datasetName, numQueries);
     simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::SegmentedLinearBucketMapper<64>>>(inputData, datasetName, numQueries);
     simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::SegmentedLinearBucketMapper<128>>>(inputData, datasetName, numQueries);
     simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::SegmentedLinearBucketMapper<256>>>(inputData, datasetName, numQueries);
+    simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::SegmentedLinearBucketMapper<512>>>(inputData, datasetName, numQueries);
     simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::SuccinctPGMBucketMapper>>(inputData, datasetName, numQueries);
 
     std::vector<std::string> inputAsString;

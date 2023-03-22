@@ -15,7 +15,7 @@ struct SegmentedLinearBucketMapper {
     template<typename RandomIt>
     SegmentedLinearBucketMapper(RandomIt begin, RandomIt end)
             : n(end - begin),
-              eliasFano(n / keysPerSegment + 3, *std::prev(end) + 2) {
+              eliasFano(n / keysPerSegment + 2, *std::prev(end)) {
 
         auto it = begin;
         while (it < end) {
@@ -23,7 +23,6 @@ struct SegmentedLinearBucketMapper {
             it += keysPerSegment;
         }
         eliasFano.push_back(*std::prev(end));
-        eliasFano.push_back(*std::prev(end) + 1);
         eliasFano.buildRankSelect();
     }
 
@@ -31,8 +30,11 @@ struct SegmentedLinearBucketMapper {
         auto segmentPtr = eliasFano.predecessorPosition(key);
         size_t segment = segmentPtr.index();
         uint64_t offset = *segmentPtr;
-        ++segmentPtr;
-        uint64_t nextOffset = *segmentPtr;
+        uint64_t nextOffset = UINT64_MAX;
+        if (segment < eliasFano.size() - 1) {
+            ++segmentPtr;
+            nextOffset = *segmentPtr;
+        }
         double slope = (float) (nextOffset - offset) / keysPerSegment;
         size_t rankInSegment = std::min<size_t>((double) (key - offset) / slope, keysPerSegment);
         size_t estimatedRank = segment * keysPerSegment + rankInSegment;

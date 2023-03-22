@@ -37,7 +37,7 @@ private:
     sdsl::int_vector<> L;
     pasta::BitVector H;
     size_t count = 0;
-    size_t universeSize = 0;
+    size_t maxValue = 0;
     pasta::FlatRankSelect<pasta::OptimizedFor::ZERO_QUERIES> *rankSelect = nullptr;
 
 #ifndef NDEBUG
@@ -114,10 +114,10 @@ public:
         invalidateSelectDatastructure();
     }
 
-    EliasFanoM(size_t num, uint64_t universeSize)
-        : L(elias_fano_lo_width(universeSize, num) == 0 ? 0 : num, 0, elias_fano_lo_width(universeSize, num)),
-          H((universeSize >> lowerBits()) + num + 1, false),
-          universeSize(universeSize) {
+    EliasFanoM(size_t num, uint64_t maxValue)
+        : L(elias_fano_lo_width(maxValue, num) == 0 ? 0 : num, 0, elias_fano_lo_width(maxValue, num)),
+          H((maxValue >> lowerBits()) + num + 1, false),
+          maxValue(maxValue) {
     }
 
     /**
@@ -126,7 +126,7 @@ public:
      */
     void add(size_t index, uint64_t element) {
         assert(index < L.size() || lowerBits() == 0);
-        assert(element < universeSize);
+        assert(element <= maxValue);
         uint64_t l = element & maskLowerBits();
         uint64_t h = element >> lowerBits();
         assert(element == h * (1l << lowerBits()) + l);
@@ -153,7 +153,7 @@ public:
 
     /**
      * Returns an ElementPointer to the last stored element that is <= the parameter.
-     * When multiple duplicate elements are stored, returns the first occurrence.
+     * When multiple duplicate elements are stored, returns any occurrence.
      */
     [[nodiscard]] ElementPointer predecessorPosition(uint64_t element) const {
         if (rankSelect == nullptr) {
@@ -224,7 +224,7 @@ public:
     }
 
     [[nodiscard]] uint64_t universe_size() {
-        return universeSize;
+        return maxValue;
     }
 
     void buildRankSelect() {
