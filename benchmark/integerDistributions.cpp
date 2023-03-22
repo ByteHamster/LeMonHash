@@ -70,11 +70,13 @@ int main(int argc, char** argv) {
     std::string filename;
     std::string type = "uniform";
     std::string datasetName = "";
+    size_t numQueries = 1e6;
 
     tlx::CmdlineParser cmd;
     cmd.add_bytes('n', "num_keys", N, "Number of keys to generate");
     cmd.add_string('t', "type", type, "Type of data to generate (uniform or pareto)");
     cmd.add_string('f', "filename", filename, "Input data set to load. First 64 bits must be length, then all following words are integers");
+    cmd.add_bytes('q', "numQueries", numQueries, "Number of queries to measure");
     if (!cmd.process(argc, argv)) {
         return 1;
     }
@@ -96,11 +98,11 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::LinearBucketMapper>>(inputData, datasetName);
-    simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::SegmentedLinearBucketMapper<64>>>(inputData, datasetName);
-    simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::SegmentedLinearBucketMapper<128>>>(inputData, datasetName);
-    simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::SegmentedLinearBucketMapper<256>>>(inputData, datasetName);
-    simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::SuccinctPGMBucketMapper>>(inputData, datasetName);
+    simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::LinearBucketMapper>>(inputData, datasetName, numQueries);
+    simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::SegmentedLinearBucketMapper<64>>>(inputData, datasetName, numQueries);
+    simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::SegmentedLinearBucketMapper<128>>>(inputData, datasetName, numQueries);
+    simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::SegmentedLinearBucketMapper<256>>>(inputData, datasetName, numQueries);
+    simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::SuccinctPGMBucketMapper>>(inputData, datasetName, numQueries);
 
     std::vector<std::string> inputAsString;
     inputAsString.reserve(inputData.size());
@@ -108,7 +110,7 @@ int main(int argc, char** argv) {
         uint64_t swapped = __builtin_bswap64(x);
         inputAsString.emplace_back((char*) &swapped, sizeof(uint64_t));
     }
-    simpleMmphfBenchmark<lemonhash::LeMonHashVL>(inputAsString, datasetName);
+    simpleMmphfBenchmark<lemonhash::LeMonHashVL>(inputAsString, datasetName, numQueries);
 
     return 0;
 }

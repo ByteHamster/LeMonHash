@@ -62,9 +62,12 @@ std::vector<std::string> loadFile(std::string &filename, size_t maxStrings) {
 int main(int argc, char** argv) {
     size_t N = std::numeric_limits<size_t>::max();
     std::string filename;
+    size_t numQueries = 1e6;
+
     tlx::CmdlineParser cmd;
     cmd.add_bytes('n', "num_keys", N, "Number of keys to generate");
     cmd.add_string('f', "filename", filename, "File with input data");
+    cmd.add_bytes('q', "numQueries", numQueries, "Number of queries to measure");
     if (!cmd.process(argc, argv)) {
         return 1;
     }
@@ -84,8 +87,8 @@ int main(int argc, char** argv) {
 
     size_t positionOfSlash = filename.find_last_of('/');
     std::string baseFilename = positionOfSlash == std::string::npos ? filename : filename.substr(positionOfSlash + 1);
-    simpleMmphfBenchmark<lemonhash::LeMonHashVL>(inputData, baseFilename);
-    simpleMmphfBenchmark<lemonhash::LeMonHashVLIndexed>(inputData, baseFilename);
+    simpleMmphfBenchmark<lemonhash::LeMonHashVL>(inputData, baseFilename, numQueries);
+    simpleMmphfBenchmark<lemonhash::LeMonHashVLIndexed>(inputData, baseFilename, numQueries);
 
     return 0;
 }
