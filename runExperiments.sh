@@ -12,11 +12,16 @@ pathToCppBinary=$2
 hostname
 strings $pathToCppBinary | grep " -m"
 
-#$pathToCppBinary --numQueries 5M --type int32 --filename "$pathToDatasetsFolder/5GRAM_1"
-$pathToCppBinary --numQueries 5M --filename "$pathToDatasetsFolder/fb_200M_uint64"
-$pathToCppBinary --numQueries 5M --filename "$pathToDatasetsFolder/osm_cellids_800M_uint64"
+mappersExceptLinear="--segmented --succinctPgm --leMonVl"
+allMappers="--linear $mappersExceptLinear"
 
-$pathToCppBinary --numQueries 5M --filename "$pathToDatasetsFolder/uniform_uint64"
-$pathToCppBinary --numQueries 5M --filename "$pathToDatasetsFolder/exponential_uint64"
-$pathToCppBinary --numQueries 5M --filename "$pathToDatasetsFolder/normal_uint64"
+$pathToCppBinary $allMappers --numQueries 5M --type int32 --filename "$pathToDatasetsFolder/5GRAM_1"
+$pathToCppBinary $mappersExceptLinear --numQueries 5M --filename "$pathToDatasetsFolder/fb_200M_uint64"
+$pathToCppBinary --linear --numQueries 10k --filename "$pathToDatasetsFolder/fb_200M_uint64"
+$pathToCppBinary $allMappers --numQueries 5M --filename "$pathToDatasetsFolder/osm_cellids_800M_uint64"
+
+$pathToCppBinary $allMappers --numQueries 5M --filename "$pathToDatasetsFolder/uniform_uint64"
+$pathToCppBinary $allMappers --numQueries 5M --filename "$pathToDatasetsFolder/exponential_uint64"
+$pathToCppBinary $mappersExceptLinear --numQueries 5M --filename "$pathToDatasetsFolder/normal_uint64"
+$pathToCppBinary --linear --numQueries 10k --filename "$pathToDatasetsFolder/normal_uint64"
 
