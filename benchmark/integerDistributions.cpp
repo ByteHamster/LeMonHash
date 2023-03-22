@@ -2,6 +2,8 @@
 #include <tlx/cmdline_parser.hpp>
 #include <LeMonHash.hpp>
 #include <LeMonHashVL.hpp>
+#include <bucket_mapping/SuccinctPGMBucketMapper.hpp>
+#include <bucket_mapping/SegmentedLinearBucketMapper.hpp>
 #include "simpleMmphfBenchmark.hpp"
 
 std::vector<uint64_t> loadIntegerFile(std::string &filename, size_t maxN) {
@@ -94,6 +96,10 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::LinearBucketMapper>>(inputData, datasetName);
+    simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::SegmentedLinearBucketMapper<64>>>(inputData, datasetName);
+    simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::SegmentedLinearBucketMapper<128>>>(inputData, datasetName);
+    simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::SegmentedLinearBucketMapper<256>>>(inputData, datasetName);
     simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::SuccinctPGMBucketMapper>>(inputData, datasetName);
 
     std::vector<std::string> inputAsString;
