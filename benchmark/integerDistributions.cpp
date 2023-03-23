@@ -1,6 +1,7 @@
 #include <unordered_set>
 #include <tlx/cmdline_parser.hpp>
 #include <LeMonHash.hpp>
+#include <LeMonHashV2.hpp>
 #include <LeMonHashVL.hpp>
 #include <bucket_mapping/SuccinctPGMBucketMapper.hpp>
 #include <bucket_mapping/SegmentedLinearBucketMapper.hpp>
@@ -142,11 +143,7 @@ int main(int argc, char** argv) {
         simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::LinearBucketMapper>>(inputData, datasetName, numQueries);
     }
     if (segmented) {
-        simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::SegmentedLinearBucketMapper<32>>>(inputData, datasetName, numQueries);
-        simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::SegmentedLinearBucketMapper<64>>>(inputData, datasetName, numQueries);
-        simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::SegmentedLinearBucketMapper<128>>>(inputData, datasetName, numQueries);
-        simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::SegmentedLinearBucketMapper<256>>>(inputData, datasetName, numQueries);
-        simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::SegmentedLinearBucketMapper<512>>>(inputData, datasetName, numQueries);
+        simpleMmphfBenchmark<lemonhash::LeMonHashV2<512>>(inputData, datasetName, numQueries);
     }
     if (succinctPgm) {
         simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::SuccinctPGMBucketMapper>>(inputData, datasetName, numQueries);
