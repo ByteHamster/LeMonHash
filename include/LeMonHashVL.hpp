@@ -51,7 +51,7 @@ void maybe_new(T &x, Args&&... args) { x = std::move(T(std::forward<Args>(args).
  * For tree nodes that refer only to a small number of chunks, where mapping would have high constant overhead,
  * we can simply store the chunks' ranks explicitly in the retrieval data structures.
  */
-template<size_t DIRECT_RANK_STORING_THRESHOLD = 128, size_t CHUNK_DIRECT_RANK_STORING_THRESHOLD = 128>
+template<size_t DIRECT_RANK_STORING_THRESHOLD = 128, size_t CHUNK_DIRECT_RANK_STORING_THRESHOLD = 128, bool ALPHABET_MAPPING = true>
 class LeMonHashVL {
     private:
         static constexpr size_t ALPHABET_MAPS_THRESHOLD = 512;
@@ -187,15 +187,18 @@ class LeMonHashVL {
             treeNode.minLCP = (*std::min_element(lcpsBegin + 1, lcpsBegin + nThisNode,
                                 [](const LcpDetails& x, const LcpDetails& y) {  return x.lcp < y.lcp; })).lcp;
 
-            if ((!alphabetMaps.isFullForBits(LOG2_ALPHABET_MAPS_COUNT) && nThisNode > ALPHABET_MAPS_THRESHOLD) || alphabetMaps.empty()) {
-                AlphabetMap am(lcpsBegin, nThisNode);
-                if (!alphabetMaps.empty() && am.length64() == alphabetMaps.length64(ancestorAlphabetMapIndex)) {
-                    treeNode.alphabetMapIndex = ancestorAlphabetMapIndex;
+            if constexpr (ALPHABET_MAPPING) {
+                if ((!alphabetMaps.isFullForBits(LOG2_ALPHABET_MAPS_COUNT) && nThisNode > ALPHABET_MAPS_THRESHOLD)
+                        || alphabetMaps.empty()) {
+                    AlphabetMap am(lcpsBegin, nThisNode);
+                    if (!alphabetMaps.empty() && am.length64() == alphabetMaps.length64(ancestorAlphabetMapIndex)) {
+                        treeNode.alphabetMapIndex = ancestorAlphabetMapIndex;
+                    } else {
+                        treeNode.alphabetMapIndex = alphabetMaps.addOrFindSimilar(am);
+                    }
                 } else {
-                    treeNode.alphabetMapIndex = alphabetMaps.addOrFindSimilar(am);
+                    treeNode.alphabetMapIndex = ancestorAlphabetMapIndex;
                 }
-            } else {
-                treeNode.alphabetMapIndex = ancestorAlphabetMapIndex;
             }
 
             auto [chunks, chunksOffsets] = extractChunks(begin, end, lcpsBegin, treeNode);
@@ -275,11 +278,29 @@ class LeMonHashVL {
         }
 
         uint64_t extractChunk(const std::string &s, const TreeNode &treeNode) {
-            return alphabetMaps.readChunk(treeNode.alphabetMapIndex, s.c_str() + treeNode.minLCP, s.length() - treeNode.minLCP);
+            if constexpr (ALPHABET_MAPPING) {
+                return alphabetMaps.readChunk(treeNode.alphabetMapIndex, s.c_str() + treeNode.minLCP, s.length() - treeNode.minLCP);
+            } else {
+                const char *str = s.c_str() + treeNode.minLCP;
+                size_t length = s.size() - treeNode.minLCP;
+                if (length >= 8)
+                    return __builtin_bswap64(*((uint64_t*) str));
+                uint64_t chunk = 0;
+                char *chunkRaw = (char*) &chunk;
+                for (size_t i = 0; i < 8 && i < length; i++) {
+                    chunkRaw[7 - i] = str[i];
+                }
+                return chunk;
+            }
         }
 
         auto extractChunks(const auto begin, const auto end, const auto lcpsBegin, const TreeNode &treeNode) {
-            auto chunkWidth = alphabetMaps.length64(treeNode.alphabetMapIndex);
+            size_t chunkWidth;
+            if constexpr (ALPHABET_MAPPING) {
+                chunkWidth = alphabetMaps.length64(treeNode.alphabetMapIndex);
+            } else {
+                chunkWidth = 8;
+            }
             auto previousChunk = extractChunk(*begin, treeNode);
 
             std::vector<uint64_t> chunks = {previousChunk};
@@ -328,7 +349,8 @@ class LeMonHashVL {
         static std::string name() {
             return std::string("LeMonHashVL")
                 + " drsThreshold=" + std::to_string(DIRECT_RANK_STORING_THRESHOLD)
-                + " chunkDrsThreshold=" + std::to_string(CHUNK_DIRECT_RANK_STORING_THRESHOLD);
+                + " chunkDrsThreshold=" + std::to_string(CHUNK_DIRECT_RANK_STORING_THRESHOLD)
+                + " alphabetMapping=" + std::to_string(ALPHABET_MAPPING);
         }
 
         size_t spaceBits() {
