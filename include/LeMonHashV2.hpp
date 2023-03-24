@@ -35,8 +35,8 @@ class LeMonHashV2 {
 
         explicit LeMonHashV2(const std::vector<uint64_t> &data)
                 : N(data.size()),
-                  segments(N / keysPerSegment),
-                  eliasFano(segments + 1, data.back()),
+                  segments((N + keysPerSegment - 1) / keysPerSegment),
+                  eliasFano(segments + 2, data.back()),
                   bucketOffsets(N, data.size()) {
             size_t prevBucket = 0;
             size_t currentBucketBegin = 0;
@@ -55,9 +55,9 @@ class LeMonHashV2 {
             for (size_t segment = 0; segment < segments; segment++) {
                 size_t firstIndexOfSegment = segment * keysPerSegment;
                 uint64_t segmentStart = data.at(firstIndexOfSegment);
-                uint64_t segmentEnd = (segment == segments - 1) ? data.back() : data.at(firstIndexOfSegment + keysPerSegment);
+                uint64_t segmentEnd = data.at(std::min(firstIndexOfSegment + keysPerSegment, N - 1));
                 eliasFano.push_back(segmentStart);
-                for (size_t i = 0; i < keysPerSegment && i < N; i++) {
+                for (size_t i = 0; i < keysPerSegment && firstIndexOfSegment + i < N; i++) {
                     size_t keyIndex = firstIndexOfSegment + i;
                     size_t bucket = bucketOf(data.at(keyIndex), segment, segmentStart, segmentEnd);
                     if (keyIndex != 0) { [[likely]]
