@@ -1,10 +1,9 @@
 #include <unordered_set>
 #include <tlx/cmdline_parser.hpp>
 #include <LeMonHash.hpp>
-#include <LeMonHashV2.hpp>
+#include <LeMonHashHeuristic.hpp>
 #include <LeMonHashVL.hpp>
 #include <bucket_mapping/SuccinctPGMBucketMapper.hpp>
-#include <bucket_mapping/SegmentedLinearBucketMapper.hpp>
 #include "simpleMmphfBenchmark.hpp"
 
 std::vector<uint64_t> loadInt64File(std::string &filename, size_t maxN) {
@@ -95,7 +94,7 @@ int main(int argc, char** argv) {
     std::string datasetName = "";
     size_t numQueries = 1e6;
     bool linear = false;
-    bool segmented = false;
+    bool heuristicSegmented = false;
     bool succinctPgm = false;
     bool leMonVl = false;
 
@@ -105,13 +104,13 @@ int main(int argc, char** argv) {
     cmd.add_string('f', "filename", filename, "Input data set to load. First 64 bits must be length, then all following words are integers");
     cmd.add_bytes('q', "numQueries", numQueries, "Number of queries to measure");
     cmd.add_flag("linear", linear, "Run with linear bucket mapper");
-    cmd.add_flag("segmented", segmented, "Run with segmented bucket mapper");
+    cmd.add_flag("heuristicSegmented", heuristicSegmented, "Run with heuristic segmented bucket mapper");
     cmd.add_flag("succinctPgm", succinctPgm, "Run with succinctPgm bucket mapper");
     cmd.add_flag("leMonVl", leMonVl, "Run with leMonVl bucket mapper");
     if (!cmd.process(argc, argv)) {
         return 1;
     }
-    if (!linear && !segmented && !succinctPgm && !leMonVl) {
+    if (!linear && !heuristicSegmented && !succinctPgm && !leMonVl) {
         succinctPgm = true;
     }
 
@@ -142,8 +141,8 @@ int main(int argc, char** argv) {
     if (linear) {
         simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::LinearBucketMapper>>(inputData, datasetName, numQueries);
     }
-    if (segmented) {
-        simpleMmphfBenchmark<lemonhash::LeMonHashV2<512>>(inputData, datasetName, numQueries);
+    if (heuristicSegmented) {
+        simpleMmphfBenchmark<lemonhash::LeMonHashHeuristic<512>>(inputData, datasetName, numQueries);
     }
     if (succinctPgm) {
         simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::SuccinctPGMBucketMapper>>(inputData, datasetName, numQueries);

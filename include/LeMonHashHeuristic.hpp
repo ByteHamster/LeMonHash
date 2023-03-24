@@ -13,12 +13,12 @@
 namespace lemonhash {
 /**
  * Learned Monotone Minimal Perfect Hash Function (MMPHF).
- * Each object is mapped to a bucket using a segmented linear mapper.
+ * Each object is mapped to a bucket using a heuristic segmented linear mapper.
  * Within the buckets, a retrieval data structure explicitly stores the ranks of all objects.
  * The prefix sum of bucket sizes is stored with Elias-Fano.
  */
 template <size_t keysPerSegment, size_t retrievalCoeffBits = 64>
-class LeMonHashV2 {
+class LeMonHashHeuristic {
     public:
         const size_t N;
     private:
@@ -29,11 +29,11 @@ class LeMonHashV2 {
     public:
         static std::string name() {
             return std::string("LeMonHash")
-                   + " bucketMapper=SegmentedV2"
+                   + " bucketMapper=HeuristicSegmented"
                    + " retrievalCoeffBits=" + std::to_string(retrievalCoeffBits);
         }
 
-        explicit LeMonHashV2(const std::vector<uint64_t> &data)
+        explicit LeMonHashHeuristic(const std::vector<uint64_t> &data)
                 : N(data.size()),
                   segments((N + keysPerSegment - 1) / keysPerSegment),
                   eliasFano(segments + 2, data.back()),
