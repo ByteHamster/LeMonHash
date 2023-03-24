@@ -48,17 +48,12 @@ void maybe_new(T &x, Args&&... args) { x = std::move(T(std::forward<Args>(args).
  * If a bucket is larger than DIRECT_RANK_STORING_THRESHOLD, we recurse
  * the data structure inside that bucket. For recursion, we cut off the
  * characters that all strings of that bucket have in common.
+ * For tree nodes that refer only to a small number of chunks, where mapping would have high constant overhead,
+ * we can simply store the chunks' ranks explicitly in the retrieval data structures.
  */
+template<size_t DIRECT_RANK_STORING_THRESHOLD = 128, size_t CHUNK_DIRECT_RANK_STORING_THRESHOLD = 128>
 class LeMonHashVL {
     private:
-        // For fewer objects, it is not worth creating a tree structure. Just store the ranks explicitly.
-        static constexpr size_t DIRECT_RANK_STORING_THRESHOLD = 128;
-
-        // For fewer than 25 chunks, it is cheaper storing the ranks explicitly than mapping them - even with the LinearBucketMapper.
-        // sizeof(LinearBucketMapper) < 25×ceil(log2(25))
-        // For some more it is not explicitly cheaper but given that the ranks are "perfect", it is still worth it.
-        static constexpr size_t CHUNK_DIRECT_RANK_STORING_THRESHOLD = 128;
-
         static constexpr size_t ALPHABET_MAPS_THRESHOLD = 512;
 
         static constexpr size_t LOG2_ALPHABET_MAPS_COUNT = 18;
@@ -331,7 +326,9 @@ class LeMonHashVL {
         ~LeMonHashVL() = default;
 
         static std::string name() {
-            return "LeMonHashVL";
+            return std::string("LeMonHashVL")
+                + " drsThreshold=" + std::to_string(DIRECT_RANK_STORING_THRESHOLD)
+                + " chunkDrsThreshold=" + std::to_string(CHUNK_DIRECT_RANK_STORING_THRESHOLD);
         }
 
         size_t spaceBits() {

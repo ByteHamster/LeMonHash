@@ -63,11 +63,15 @@ int main(int argc, char** argv) {
     size_t N = std::numeric_limits<size_t>::max();
     std::string filename;
     size_t numQueries = 1e6;
+    bool indexed = false;
+    bool thresholds = false;
 
     tlx::CmdlineParser cmd;
     cmd.add_bytes('n', "num_keys", N, "Number of keys to generate");
     cmd.add_string('f', "filename", filename, "File with input data");
     cmd.add_bytes('q', "numQueries", numQueries, "Number of queries to measure");
+    cmd.add_flag("indexed", indexed, "Include indexed variant");
+    cmd.add_flag("thresholds", thresholds, "Test multiple different thresholds for direct rank storing");
     if (!cmd.process(argc, argv)) {
         return 1;
     }
@@ -87,8 +91,20 @@ int main(int argc, char** argv) {
 
     size_t positionOfSlash = filename.find_last_of('/');
     std::string baseFilename = positionOfSlash == std::string::npos ? filename : filename.substr(positionOfSlash + 1);
-    simpleMmphfBenchmark<lemonhash::LeMonHashVL>(inputData, baseFilename, numQueries);
-    simpleMmphfBenchmark<lemonhash::LeMonHashVLIndexed>(inputData, baseFilename, numQueries);
+
+    if (!thresholds) {
+        simpleMmphfBenchmark<lemonhash::LeMonHashVL<>>(inputData, baseFilename, numQueries);
+    } else {
+        simpleMmphfBenchmark<lemonhash::LeMonHashVL<64, 128>>(inputData, baseFilename, numQueries);
+        simpleMmphfBenchmark<lemonhash::LeMonHashVL<128, 128>>(inputData, baseFilename, numQueries);
+        simpleMmphfBenchmark<lemonhash::LeMonHashVL<256, 128>>(inputData, baseFilename, numQueries);
+        simpleMmphfBenchmark<lemonhash::LeMonHashVL<128, 64>>(inputData, baseFilename, numQueries);
+        simpleMmphfBenchmark<lemonhash::LeMonHashVL<128, 256>>(inputData, baseFilename, numQueries);
+    }
+
+    if (indexed) {
+        simpleMmphfBenchmark<lemonhash::LeMonHashVLIndexed>(inputData, baseFilename, numQueries);
+    }
 
     return 0;
 }

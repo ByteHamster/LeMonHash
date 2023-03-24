@@ -154,7 +154,7 @@ int main(int argc, char** argv) {
             uint64_t swapped = __builtin_bswap64(x);
             inputAsString.emplace_back((char*) &swapped, sizeof(uint64_t));
         }
-        simpleMmphfBenchmark<lemonhash::LeMonHashVL>(inputAsString, datasetName, numQueries);
+        simpleMmphfBenchmark<lemonhash::LeMonHashVL<>>(inputAsString, datasetName, numQueries);
     }
     return 0;
 }
