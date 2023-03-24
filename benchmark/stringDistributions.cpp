@@ -38,7 +38,6 @@ std::vector<std::string> randomUniformStrings(size_t n, size_t length, size_t co
 
 std::vector<std::string> loadFile(std::string &filename, size_t maxStrings) {
     std::vector<std::string> inputData;
-    inputData.reserve(maxStrings);
     std::ifstream stream(filename);
     if (!stream) throw std::system_error(errno, std::system_category(), "failed to open " + filename);
     const int MAX_LENGTH = 524288;
