@@ -72,7 +72,7 @@ struct SuccinctPGMBucketMapper {
     }
 
     static std::string name() {
-        return std::string("SuccinctPGMBucketMapper") + (autoTune ? "" : "FixedEps");
+        return std::string("SuccinctPGMBucketMapper") + (autoTune ? "AutoTune" : "FixedEps");
     }
 
     [[nodiscard]] std::string info() const {

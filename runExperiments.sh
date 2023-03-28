@@ -12,7 +12,7 @@ pathToCppBinary=$2
 hostname
 strings $pathToCppBinary | grep " -m"
 
-mappersExceptLinear="--segmented --succinctPgm --leMonVl"
+mappersExceptLinear="--segmented --succinctPgm --succinctPgmAutoTune --leMonVl"
 allMappers="--linear $mappersExceptLinear"
 
 $pathToCppBinary $allMappers --numQueries 5M --type int32 --filename "$pathToDatasetsFolder/5GRAM_1"

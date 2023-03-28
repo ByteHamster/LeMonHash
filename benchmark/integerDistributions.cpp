@@ -96,6 +96,7 @@ int main(int argc, char** argv) {
     bool linear = false;
     bool heuristicSegmented = false;
     bool succinctPgm = false;
+    bool succinctPgmAutoTune = false;
     bool leMonVl = false;
 
     tlx::CmdlineParser cmd;
@@ -106,12 +107,13 @@ int main(int argc, char** argv) {
     cmd.add_flag("linear", linear, "Run with linear bucket mapper");
     cmd.add_flag("heuristicSegmented", heuristicSegmented, "Run with heuristic segmented bucket mapper");
     cmd.add_flag("succinctPgm", succinctPgm, "Run with succinctPgm bucket mapper");
+    cmd.add_flag("succinctPgmAutoTune", succinctPgmAutoTune, "Run with succinctPgmAutoTune bucket mapper");
     cmd.add_flag("leMonVl", leMonVl, "Run with leMonVl bucket mapper");
     if (!cmd.process(argc, argv)) {
         return 1;
     }
-    if (!linear && !heuristicSegmented && !succinctPgm && !leMonVl) {
-        succinctPgm = true;
+    if (!linear && !heuristicSegmented && !succinctPgm && !leMonVl && !succinctPgmAutoTune) {
+        succinctPgmAutoTune = true;
     }
 
     std::cout<<"Generating input data"<<std::endl;
@@ -144,8 +146,11 @@ int main(int argc, char** argv) {
     if (heuristicSegmented) {
         simpleMmphfBenchmark<lemonhash::LeMonHashHeuristic<512>>(inputData, datasetName, numQueries);
     }
+    if (succinctPgmAutoTune) {
+        simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::SuccinctPGMBucketMapper<true>>>(inputData, datasetName, numQueries);
+    }
     if (succinctPgm) {
-        simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::SuccinctPGMBucketMapper<>>>(inputData, datasetName, numQueries);
+        simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::SuccinctPGMBucketMapper<false>>>(inputData, datasetName, numQueries);
     }
     if (leMonVl) {
         std::vector<std::string> inputAsString;
