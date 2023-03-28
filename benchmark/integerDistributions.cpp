@@ -145,7 +145,7 @@ int main(int argc, char** argv) {
         simpleMmphfBenchmark<lemonhash::LeMonHashHeuristic<512>>(inputData, datasetName, numQueries);
     }
     if (succinctPgm) {
-        simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::SuccinctPGMBucketMapper>>(inputData, datasetName, numQueries);
+        simpleMmphfBenchmark<lemonhash::LeMonHash<lemonhash::SuccinctPGMBucketMapper<>>>(inputData, datasetName, numQueries);
     }
     if (leMonVl) {
         std::vector<std::string> inputAsString;

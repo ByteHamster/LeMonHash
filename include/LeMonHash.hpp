@@ -17,7 +17,7 @@ namespace lemonhash {
  * Within the buckets, a retrieval data structure explicitly stores the ranks of all objects.
  * The prefix sum of bucket sizes is stored with Elias-Fano.
  */
-template <typename BucketMapper = SuccinctPGMBucketMapper, size_t retrievalCoeffBits = 64>
+template <typename BucketMapper = SuccinctPGMBucketMapper<>, size_t retrievalCoeffBits = 64>
 class LeMonHash {
     public:
         size_t N;

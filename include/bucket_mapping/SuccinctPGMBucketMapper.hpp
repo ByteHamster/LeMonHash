@@ -6,6 +6,7 @@ namespace lemonhash {
 /**
  * Uses a succinct version of the PGM Index to get an approximate rank, which we use as bucket index.
  */
+template <bool autoTune = true>
 struct SuccinctPGMBucketMapper {
     pgm::SuccinctPGMIndex<> pgm;
 
@@ -13,6 +14,11 @@ struct SuccinctPGMBucketMapper {
 
     template<typename RandomIt>
     SuccinctPGMBucketMapper(RandomIt begin, RandomIt end) {
+        if constexpr (!autoTune) {
+            pgm = std::move(decltype(pgm)(begin, end, 31));
+            return;
+        }
+
         auto bestCost = std::numeric_limits<size_t>::max();
 
         size_t cost;
@@ -66,7 +72,7 @@ struct SuccinctPGMBucketMapper {
     }
 
     static std::string name() {
-        return "SuccinctPGMBucketMapper";
+        return std::string("SuccinctPGMBucketMapper") + (autoTune ? "" : "FixedEps");
     }
 
     [[nodiscard]] std::string info() const {
