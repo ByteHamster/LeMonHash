@@ -51,13 +51,11 @@ public:
             auto y0 = cs.rectangle[1].y;
             auto x1 = cs.rectangle[3].x;
             auto y1 = cs.rectangle[3].y;
-            auto eval1 = evaluate(cs.first.x, x0, x1, y0, y1);
-            auto eval2 = evaluate(last_point.first, x0, x1, y0, y1);
+            auto eval1 = evaluate<false>(cs.first.x, x0, x1, y0, y1);
+            auto eval2 = evaluate<false>(last_point.first, x0, x1, y0, y1);
             auto yshift1 = cs.first.y - eval1 + epsilon;
             auto yshift2 = last_point.second - eval2 + epsilon;
-            if (yshift1 < 0 || yshift2 < 0
-                || std::bit_width(yshift1) > yshift_width
-                || std::bit_width(yshift2) > yshift_width)
+            if (std::bit_width(yshift1) > yshift_width || std::bit_width(yshift2) > yshift_width)
                 throw std::runtime_error("Unexpected shift > epsilon");
 
             xs_data.emplace_back(last_point.first - first_key);
@@ -95,7 +93,7 @@ public:
                 ++segment_it;
                 std::tie(x0, x1, y0, y1, y2) = *segment_it;
             }
-            auto eval = evaluate(*it - first_key, x0, x1, y0, y1);
+            auto eval = evaluate<true>(*it - first_key, x0, x1, y0, y1);
             auto pos = std::min<size_t>(eval > 0 ? size_t(eval) : 0ull, y2 - 1);
             assert(std::abs(int64_t(pos) - int64_t(std::distance(first, it))) <= points.epsilon_value() + 1);
             f(it, pos);
@@ -108,7 +106,7 @@ public:
         if (key < first_key)
             return 0;
         auto [point_index, x0, x1, y0, y1, y2] = points.segment_for_key(key - first_key);
-        auto eval = evaluate(key - first_key, x0, x1, y0, y1);
+        auto eval = evaluate<true>(key - first_key, x0, x1, y0, y1);
         auto pos = std::min<size_t>(eval > 0 ? size_t(eval) : 0ull, y2 - 1);
         return pos;
     }
@@ -135,7 +133,20 @@ public:
 
 private:
 
-    [[nodiscard]] int64_t evaluate(K k, K x0, K x1, int64_t y0, int64_t y1) const {
+    template<bool Query>
+    [[nodiscard]] static inline size_t evaluate(K k, K x0, K x1, size_t y0, size_t y1) {
+        assert(x0 <= x1 && y0 <= y1);
+        if constexpr (Query) {
+            assert(k >= x0);
+            size_t mul;
+            if (!__builtin_mul_overflow(k - x0, y1 - y0, &mul))
+                return y0 + mul / (x1 - x0);
+        } else {
+            int64_t dk;
+            int64_t mul;
+            if (!__builtin_sub_overflow(k, x0, &dk) && !__builtin_mul_overflow(dk, int64_t(y1 - y0), &mul))
+                return int64_t(y0) + mul / int64_t(x1 - x0);
+        }
         return y0 + ((__int128(k) - x0) * (y1 - y0)) / (x1 - x0);
     }
 };

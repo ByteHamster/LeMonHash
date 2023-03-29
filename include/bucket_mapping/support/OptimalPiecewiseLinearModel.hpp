@@ -293,7 +293,7 @@ size_t make_segmentation_mod(size_t n, size_t epsilon, Fin in, Fout out, bool co
     auto p = in(0);
 
     OptimalPiecewiseLinearModel<X, Y> opt(epsilon);
-    opt.add_point(p.first, p.second);
+    opt.add_point(p.first, p.second, 0, epsilon);
 
     for (size_t i = 1; i < n; ++i) {
         auto next_p = in(i);
