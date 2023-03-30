@@ -76,7 +76,8 @@ struct UnalignedPGMBucketMapper {
     }
 
     static std::string name() {
-        return "UnalignedPGMBucketMapper";
+        return std::string("UnalignedPGMBucketMapper")
+               + " epsilon=" + std::to_string(epsilon);
     }
 
     [[nodiscard]] std::string info() const {

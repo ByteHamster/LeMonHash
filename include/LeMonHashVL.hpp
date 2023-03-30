@@ -350,7 +350,8 @@ class LeMonHashVL {
             return std::string("LeMonHashVL")
                 + " drsThreshold=" + std::to_string(DIRECT_RANK_STORING_THRESHOLD)
                 + " chunkDrsThreshold=" + std::to_string(CHUNK_DIRECT_RANK_STORING_THRESHOLD)
-                + " alphabetMapping=" + std::to_string(ALPHABET_MAPPING);
+                + " alphabetMapping=" + std::to_string(ALPHABET_MAPPING)
+                + " bucketMapper=" + BucketMapperType::name();
         }
 
         size_t spaceBits() {
