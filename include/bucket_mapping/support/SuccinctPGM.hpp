@@ -143,9 +143,12 @@ private:
                 return y0 + mul / (x1 - x0);
         } else {
             int64_t dk;
+            int64_t dx;
             int64_t mul;
-            if (!__builtin_sub_overflow(k, x0, &dk) && !__builtin_mul_overflow(dk, int64_t(y1 - y0), &mul))
-                return int64_t(y0) + mul / int64_t(x1 - x0);
+            if (!__builtin_sub_overflow(k, x0, &dk)
+                && !__builtin_sub_overflow(x1, x0, &dx)
+                && !__builtin_mul_overflow(dk, int64_t(y1 - y0), &mul))
+                return int64_t(y0) + mul / dx;
         }
         return y0 + ((__int128(k) - x0) * (y1 - y0)) / (x1 - x0);
     }
