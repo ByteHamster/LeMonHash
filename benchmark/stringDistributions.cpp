@@ -58,28 +58,19 @@ std::vector<std::string> loadFile(std::string &filename, size_t maxStrings) {
     return inputData;
 }
 
-template <bool alphabetMaps>
-void dispatchVariants(std::vector<std::string> &inputData, std::string &baseFilename, size_t &numQueries) {
-    simpleMmphfBenchmark<lemonhash::LeMonHashVL<64, 128, alphabetMaps>>(inputData, baseFilename, numQueries);
-    simpleMmphfBenchmark<lemonhash::LeMonHashVL<128, 128, alphabetMaps>>(inputData, baseFilename, numQueries);
-    simpleMmphfBenchmark<lemonhash::LeMonHashVL<256, 128, alphabetMaps>>(inputData, baseFilename, numQueries);
-    simpleMmphfBenchmark<lemonhash::LeMonHashVL<128, 64, alphabetMaps>>(inputData, baseFilename, numQueries);
-    simpleMmphfBenchmark<lemonhash::LeMonHashVL<128, 256, alphabetMaps>>(inputData, baseFilename, numQueries);
-}
-
 int main(int argc, char** argv) {
     size_t N = std::numeric_limits<size_t>::max();
     std::string filename;
     size_t numQueries = 1e6;
     bool indexed = false;
-    bool variants = false;
+    bool withoutAlphabetMaps = false;
 
     tlx::CmdlineParser cmd;
     cmd.add_bytes('n', "num_keys", N, "Number of keys to generate");
     cmd.add_string('f', "filename", filename, "File with input data");
     cmd.add_bytes('q', "numQueries", numQueries, "Number of queries to measure");
     cmd.add_flag("indexed", indexed, "Include indexed variant");
-    cmd.add_flag("variants", variants, "Run multiple different compile time constants");
+    cmd.add_flag("withoutAlphabetMaps", withoutAlphabetMaps, "Also run variant without alphabet maps");
     if (!cmd.process(argc, argv)) {
         return 1;
     }
@@ -100,13 +91,11 @@ int main(int argc, char** argv) {
     size_t positionOfSlash = filename.find_last_of('/');
     std::string baseFilename = positionOfSlash == std::string::npos ? filename : filename.substr(positionOfSlash + 1);
 
-    if (!variants) {
-        simpleMmphfBenchmark<lemonhash::LeMonHashVL<>>(inputData, baseFilename, numQueries);
-    } else {
-        dispatchVariants<true>(inputData, baseFilename, numQueries);
-        dispatchVariants<false>(inputData, baseFilename, numQueries);
-    }
+    simpleMmphfBenchmark<lemonhash::LeMonHashVL<128, 128, true>>(inputData, baseFilename, numQueries);
 
+    if (withoutAlphabetMaps) {
+        simpleMmphfBenchmark<lemonhash::LeMonHashVL<128, 128, false>>(inputData, baseFilename, numQueries);
+    }
     if (indexed) {
         simpleMmphfBenchmark<lemonhash::LeMonHashVLIndexed>(inputData, baseFilename, numQueries);
     }
