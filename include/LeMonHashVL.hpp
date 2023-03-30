@@ -20,7 +20,6 @@
 #include "LeMonHash.hpp"
 
 namespace lemonhash {
-using BucketMapperType = UnalignedPGMBucketMapper;
 
 template <typename T>
 T& maybe_deref(T &x) { return x; }
@@ -51,7 +50,8 @@ void maybe_new(T &x, Args&&... args) { x = std::move(T(std::forward<Args>(args).
  * For tree nodes that refer only to a small number of chunks, where mapping would have high constant overhead,
  * we can simply store the chunks' ranks explicitly in the retrieval data structures.
  */
-template<size_t DIRECT_RANK_STORING_THRESHOLD = 128, size_t CHUNK_DIRECT_RANK_STORING_THRESHOLD = 128, bool ALPHABET_MAPPING = true>
+template<size_t DIRECT_RANK_STORING_THRESHOLD = 128, size_t CHUNK_DIRECT_RANK_STORING_THRESHOLD = 128,
+        bool ALPHABET_MAPPING = true, typename BucketMapperType = UnalignedPGMBucketMapper<>>
 class LeMonHashVL {
     private:
         static constexpr size_t ALPHABET_MAPS_THRESHOLD = 512;

@@ -5,6 +5,8 @@
 namespace lemonhash {
 class LeMonHashVLIndexed {
     private:
+        using BucketMapperType = UnalignedPGMBucketMapper<>;
+
         static constexpr size_t DIRECT_RANK_STORING_THRESHOLD = 128;
 
         static constexpr size_t CHUNK_DIRECT_RANK_STORING_THRESHOLD = 128;

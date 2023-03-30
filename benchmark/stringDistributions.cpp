@@ -64,6 +64,7 @@ int main(int argc, char** argv) {
     size_t numQueries = 1e6;
     bool indexed = false;
     bool withoutAlphabetMaps = false;
+    bool fixedEpsilon = false;
 
     tlx::CmdlineParser cmd;
     cmd.add_bytes('n', "num_keys", N, "Number of keys to generate");
@@ -71,6 +72,7 @@ int main(int argc, char** argv) {
     cmd.add_bytes('q', "numQueries", numQueries, "Number of queries to measure");
     cmd.add_flag("indexed", indexed, "Include indexed variant");
     cmd.add_flag("withoutAlphabetMaps", withoutAlphabetMaps, "Also run variant without alphabet maps");
+    cmd.add_flag("fixedEpsilon", fixedEpsilon, "Also run variant with a fixed epsilon value");
     if (!cmd.process(argc, argv)) {
         return 1;
     }
@@ -95,6 +97,10 @@ int main(int argc, char** argv) {
 
     if (withoutAlphabetMaps) {
         simpleMmphfBenchmark<lemonhash::LeMonHashVL<128, 128, false>>(inputData, baseFilename, numQueries);
+    }
+    if (fixedEpsilon) {
+        simpleMmphfBenchmark<lemonhash::LeMonHashVL<128, 128, true,
+                lemonhash::UnalignedPGMBucketMapper<31>>>(inputData, baseFilename, numQueries);
     }
     if (indexed) {
         simpleMmphfBenchmark<lemonhash::LeMonHashVLIndexed>(inputData, baseFilename, numQueries);
