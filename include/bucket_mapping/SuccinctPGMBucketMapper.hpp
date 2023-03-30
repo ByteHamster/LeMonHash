@@ -5,8 +5,9 @@
 namespace lemonhash {
 /**
  * Uses a succinct version of the PGM Index to get an approximate rank, which we use as bucket index.
+ * Selecting epsilon=0 enables auto-tuning based on trying different epsilon values.
  */
-template <bool autoTune = true>
+template <size_t epsilon = 31>
 struct SuccinctPGMBucketMapper {
     pgm::SuccinctPGMIndex<> pgm;
 
@@ -14,8 +15,8 @@ struct SuccinctPGMBucketMapper {
 
     template<typename RandomIt>
     SuccinctPGMBucketMapper(RandomIt begin, RandomIt end) {
-        if constexpr (!autoTune) {
-            pgm = std::move(decltype(pgm)(begin, end, 31));
+        if constexpr (epsilon != 0) {
+            pgm = std::move(decltype(pgm)(begin, end, epsilon));
             return;
         }
 
@@ -34,8 +35,8 @@ struct SuccinctPGMBucketMapper {
         };
 
         // Evaluate PGM
-        for (auto epsilon : {63, 31, 15}) {
-            decltype(pgm) p(begin, end, epsilon);
+        for (auto eps : {63, 31, 15}) {
+            decltype(pgm) p(begin, end, eps);
 
             cost = p.size_in_bytes() * 8;
             if (cost >= bestCost) {
@@ -72,7 +73,8 @@ struct SuccinctPGMBucketMapper {
     }
 
     static std::string name() {
-        return std::string("SuccinctPGMBucketMapper") + (autoTune ? "AutoTune" : "FixedEps");
+        return std::string("SuccinctPGMBucketMapper")
+                + " epsilon=" + std::to_string(epsilon);
     }
 
     [[nodiscard]] std::string info() const {
