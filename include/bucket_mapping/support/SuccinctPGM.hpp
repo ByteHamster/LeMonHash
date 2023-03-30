@@ -32,8 +32,9 @@ public:
         if (n == 0)
             return;
 
+        bool skip_first = n > 2; // the first key will always be mapped to rank 0, so we skip it in the segmentation
         std::vector<K> xs_data = {0};
-        std::vector<size_t> ys_data = {0};
+        std::vector<size_t> ys_data = {skip_first};
         std::vector<uint32_t> yshifts_data;
         auto yshift_width = yshift_bit_width(epsilon);
 
@@ -42,7 +43,6 @@ public:
         ys_data.reserve(expected_segments + 2);
         yshifts_data.reserve(expected_segments * 2 + 1);
 
-        bool skip_first = n > 2; // the first key will always be mapped to rank 0, so we skip it in the segmentation
         auto first_key = first[skip_first];
 
         auto in_fun = [&](auto i) { return std::pair<K, size_t>(first[i + skip_first], i + skip_first); };
