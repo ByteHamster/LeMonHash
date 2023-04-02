@@ -44,9 +44,11 @@ private:
     uint64_t previousInsert = 0;
 #endif
 
-    [[nodiscard]] uint8_t lowerBits() const { return L.width(); }
+    [[nodiscard]] inline uint8_t lowerBits() const { return L.width(); }
 
-    [[nodiscard]] uint64_t maskLowerBits() const { return sdsl::bits::lo_set[lowerBits()]; }
+    [[nodiscard]] inline uint64_t maskLowerBits() const { return sdsl::bits::lo_set[lowerBits()]; }
+
+    [[nodiscard]] inline uint64_t getLo(size_t i) const { return readInt(L.data(), i * lowerBits(), lowerBits()); }
 
 public:
 
@@ -97,7 +99,7 @@ public:
 
         uint64_t operator*() const {
             assert(positionL < fano->count);
-            uint64_t l = fano->lowerBits() ? fano->L[positionL] : 0;
+            uint64_t l = fano->lowerBits() ? fano->getLo(positionL) : 0;
             return ((positionH - positionL) << fano->lowerBits()) | l;
         }
 
@@ -175,7 +177,7 @@ public:
         while (bucketCount > 0) {
             auto step = bucketCount / 2;
             auto mid = rankLo + step;
-            if (L[mid] <= elementL) {
+            if (getLo(mid) <= elementL) {
                 rankLo = mid + 1;
                 bucketCount -= step + 1;
             } else {

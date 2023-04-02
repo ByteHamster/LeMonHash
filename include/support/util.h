@@ -7,6 +7,7 @@
 #include <bit>
 #include <sdsl/bits.hpp>
 #include <set>
+#include <immintrin.h>
 
 namespace lemonhash {
 struct LcpDetails {
@@ -69,7 +70,7 @@ auto distinctMinima(const auto begin, const auto end, size_t k, auto lowerBound)
 }
 
 /** Finds the next set bit after a given position. */
-static uint64_t nextOne(size_t i, const uint64_t *data) {
+uint64_t nextOne(size_t i, const uint64_t *data) {
     auto wordIdx = i / 64;
     auto word = data[wordIdx] & sdsl::bits::lo_unset[i % 64];
     word &= word - 1;
@@ -79,11 +80,29 @@ static uint64_t nextOne(size_t i, const uint64_t *data) {
 }
 
 /** Finds the previous set bit before a given position. */
-static uint64_t prevOne(size_t i, const uint64_t *data) {
+uint64_t prevOne(size_t i, const uint64_t *data) {
     auto wordIdx = i / 64;
     auto word = data[wordIdx] & sdsl::bits::lo_set[i % 64];
     while (word == 0)
         word = data[--wordIdx];
     return wordIdx * 64 + 63 - __builtin_clzll(word);
 }
+
+/** Extract contiguous bits from a 64-bit integer. */
+uint64_t bextr(uint64_t word, unsigned int offset, unsigned int length) {
+#ifdef __BMI__
+    return _bextr_u64(word, offset, length);
+#else
+    return (word >> offset) & sdsl::bits::lo_set[length];
+#endif
+}
+
+/** Reads the specified number of bits (must be < 58) from the given position. */
+uint64_t readInt(const uint64_t *data, uint64_t bitOffset, uint8_t length) {
+    assert(length < 58);
+    auto ptr = reinterpret_cast<const char*>(data);
+    auto word = *(reinterpret_cast<const uint64_t *>(ptr + bitOffset / 8));
+    return bextr(word, bitOffset % 8, length);
+}
+
 } // namespace lemonhash
