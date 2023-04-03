@@ -7,7 +7,7 @@ namespace lemonhash {
  * Uses a PGM-index to get an approximate rank, which we use as bucket index.
  * Selecting epsilon=0 enables auto-tuning based on trying different epsilon values.
  */
-template <size_t epsilon = 0>
+template <size_t epsilon = 63>
 struct UnalignedPGMBucketMapper {
     pgm::UnalignedPGMIndex pgm;
 

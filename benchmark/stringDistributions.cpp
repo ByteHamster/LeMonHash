@@ -93,14 +93,13 @@ int main(int argc, char** argv) {
     size_t positionOfSlash = filename.find_last_of('/');
     std::string baseFilename = positionOfSlash == std::string::npos ? filename : filename.substr(positionOfSlash + 1);
 
-    simpleMmphfBenchmark<lemonhash::LeMonHashVL<128, 128, true>>(inputData, baseFilename, numQueries);
+    simpleMmphfBenchmark<lemonhash::LeMonHashVL<128, 128, true, lemonhash::UnalignedPGMBucketMapper<0>>>(inputData, baseFilename, numQueries);
 
     if (withoutAlphabetMaps) {
-        simpleMmphfBenchmark<lemonhash::LeMonHashVL<128, 128, false>>(inputData, baseFilename, numQueries);
+        simpleMmphfBenchmark<lemonhash::LeMonHashVL<128, 128, false, lemonhash::UnalignedPGMBucketMapper<0>>>(inputData, baseFilename, numQueries);
     }
     if (fixedEpsilon) {
-        simpleMmphfBenchmark<lemonhash::LeMonHashVL<128, 128, true,
-                lemonhash::UnalignedPGMBucketMapper<31>>>(inputData, baseFilename, numQueries);
+        simpleMmphfBenchmark<lemonhash::LeMonHashVL<128, 128, true, lemonhash::UnalignedPGMBucketMapper<63>>>(inputData, baseFilename, numQueries);
     }
     if (indexed) {
         simpleMmphfBenchmark<lemonhash::LeMonHashVLIndexed>(inputData, baseFilename, numQueries);
