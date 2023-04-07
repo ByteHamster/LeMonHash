@@ -75,8 +75,10 @@ struct AlphabetMap {
             }
         }
 
-        /** Returns the rank of a given character in the alphabet. */
+        /** Returns the rank of a given character in the alphabet if the character is present, otherwise returns 0. */
         size_t rank(uint8_t c) const {
+            if (!contains(c))
+                return 0;
             if constexpr (ASCII)
                 c = c < 128 ? c : 127;
             auto rank = 0;
