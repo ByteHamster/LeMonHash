@@ -1,6 +1,6 @@
 # Learned Monotone Minimal Perfect Hashing
 
-<img src="lemon_wordmark.svg" width="400" alt="Logo">
+<img src="lemon_wordmark.png" width="400" alt="Logo">
 
 LeMonHash is a Monotone Minimal Perfect Hash function that combines
 the [PGM-Index](https://github.com/gvinciguerra/PGM-index) for space-efficient ranking
