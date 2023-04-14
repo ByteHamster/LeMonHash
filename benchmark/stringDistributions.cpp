@@ -65,6 +65,7 @@ int main(int argc, char** argv) {
     bool indexed = false;
     bool withoutAlphabetMaps = false;
     bool fixedEpsilon = false;
+    bool differentThresholds = false;
 
     tlx::CmdlineParser cmd;
     cmd.add_bytes('n', "num_keys", N, "Number of keys to generate");
@@ -73,6 +74,7 @@ int main(int argc, char** argv) {
     cmd.add_flag("indexed", indexed, "Include indexed variant");
     cmd.add_flag("withoutAlphabetMaps", withoutAlphabetMaps, "Also run variant without alphabet maps");
     cmd.add_flag("fixedEpsilon", fixedEpsilon, "Also run variant with a fixed epsilon value");
+    cmd.add_flag("differentThresholds", differentThreshilds, "Also run variant with different thresholds");
     if (!cmd.process(argc, argv)) {
         return 1;
     }
@@ -100,6 +102,19 @@ int main(int argc, char** argv) {
     }
     if (fixedEpsilon) {
         simpleMmphfBenchmark<lemonhash::LeMonHashVL<128, 128, true, lemonhash::UnalignedPGMBucketMapper<63>>>(inputData, baseFilename, numQueries);
+    }
+    if (differentThresholds) {
+        simpleMmphfBenchmark<lemonhash::LeMonHashVL<64, 64, true, lemonhash::UnalignedPGMBucketMapper<63>>>(inputData, baseFilename, numQueries);
+        simpleMmphfBenchmark<lemonhash::LeMonHashVL<64, 128, true, lemonhash::UnalignedPGMBucketMapper<63>>>(inputData, baseFilename, numQueries);
+        simpleMmphfBenchmark<lemonhash::LeMonHashVL<64, 256, true, lemonhash::UnalignedPGMBucketMapper<63>>>(inputData, baseFilename, numQueries);
+
+        simpleMmphfBenchmark<lemonhash::LeMonHashVL<128, 64, true, lemonhash::UnalignedPGMBucketMapper<63>>>(inputData, baseFilename, numQueries);
+        simpleMmphfBenchmark<lemonhash::LeMonHashVL<128, 128, true, lemonhash::UnalignedPGMBucketMapper<63>>>(inputData, baseFilename, numQueries);
+        simpleMmphfBenchmark<lemonhash::LeMonHashVL<128, 256, true, lemonhash::UnalignedPGMBucketMapper<63>>>(inputData, baseFilename, numQueries);
+
+        simpleMmphfBenchmark<lemonhash::LeMonHashVL<256, 64, true, lemonhash::UnalignedPGMBucketMapper<63>>>(inputData, baseFilename, numQueries);
+        simpleMmphfBenchmark<lemonhash::LeMonHashVL<256, 128, true, lemonhash::UnalignedPGMBucketMapper<63>>>(inputData, baseFilename, numQueries);
+        simpleMmphfBenchmark<lemonhash::LeMonHashVL<256, 256, true, lemonhash::UnalignedPGMBucketMapper<63>>>(inputData, baseFilename, numQueries);
     }
     if (indexed) {
         simpleMmphfBenchmark<lemonhash::LeMonHashVLIndexed>(inputData, baseFilename, numQueries);
