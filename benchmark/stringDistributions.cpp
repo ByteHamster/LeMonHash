@@ -74,7 +74,7 @@ int main(int argc, char** argv) {
     cmd.add_flag("indexed", indexed, "Include indexed variant");
     cmd.add_flag("withoutAlphabetMaps", withoutAlphabetMaps, "Also run variant without alphabet maps");
     cmd.add_flag("fixedEpsilon", fixedEpsilon, "Also run variant with a fixed epsilon value");
-    cmd.add_flag("differentThresholds", differentThreshilds, "Also run variant with different thresholds");
+    cmd.add_flag("differentThresholds", differentThresholds, "Also run variant with different thresholds");
     if (!cmd.process(argc, argv)) {
         return 1;
     }
