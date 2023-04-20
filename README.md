@@ -24,6 +24,16 @@ add_subdirectory(path/to/LeMonHash)
 target_link_libraries(YourTarget PRIVATE LeMonHash)
 ```
 
+Then you can use the straight-forward interface of LeMonHash:
+
+```
+std::vector<uint64_t> inputData {0, 1, 7, 15, 23, 42, 250};
+lemonhash::LeMonHash<> hashFunc(inputData);
+for (uint64_t x : inputData) {
+    std::cout << x << ": \t" << hashFunc(x) << std::endl;
+}
+```
+
 ### License
 
 This code is licensed under the [GPLv3](/LICENSE).
