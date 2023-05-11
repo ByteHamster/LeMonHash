@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <cstdint>
 #include <cassert>
 #include <sdsl/bit_vectors.hpp>
 #include <pasta/bit_vector/bit_vector.hpp>

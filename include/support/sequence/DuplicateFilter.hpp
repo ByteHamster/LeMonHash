@@ -1,7 +1,8 @@
 #pragma once
 
-#include <compact_elias_fano.hpp>
 #include <vector>
+#include <cstdint>
+#include <compact_elias_fano.hpp>
 #include <pasta/bit_vector/bit_vector.hpp>
 #include <pasta/bit_vector/support/flat_rank_select.hpp>
 #include "support/sequence/EliasFanoModified.hpp"

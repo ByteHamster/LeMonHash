@@ -1,7 +1,8 @@
 #pragma once
 
-#include "support/PolymorphicPGM.hpp"
+#include <cstdint>
 #include <bit>
+#include "support/PolymorphicPGM.hpp"
 
 namespace lemonhash {
 /**

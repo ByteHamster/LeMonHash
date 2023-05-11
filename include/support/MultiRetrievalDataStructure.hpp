@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include "SimpleRibbon.h"
 #include "MurmurHash64.h"
 #include "support/util.h"

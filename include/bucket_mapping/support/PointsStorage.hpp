@@ -1,11 +1,12 @@
 #pragma once
 
+#include <cstdint>
 #include <sdsl/int_vector.hpp>
-#include "support/sequence/EliasFanoModified.hpp"
 #include <compact_elias_fano.hpp>
 #include <strict_elias_fano.hpp>
 #include <partitioned_sequence.hpp>
 #include <uniform_partitioned_sequence.hpp>
+#include "support/sequence/EliasFanoModified.hpp"
 
 namespace lemonhash::pgm {
 

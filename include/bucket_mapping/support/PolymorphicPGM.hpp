@@ -1,8 +1,5 @@
 #pragma once
 
-#include "OptimalPiecewiseLinearModel.hpp"
-#include "SuccinctPGM.hpp"
-#include <sdsl/bits.hpp>
 #include <algorithm>
 #include <bit>
 #include <cstddef>
@@ -13,6 +10,9 @@
 #include <stdexcept>
 #include <utility>
 #include <vector>
+#include <sdsl/bits.hpp>
+#include "OptimalPiecewiseLinearModel.hpp"
+#include "SuccinctPGM.hpp"
 
 namespace lemonhash::pgm {
 

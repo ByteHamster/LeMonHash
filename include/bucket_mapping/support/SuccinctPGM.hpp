@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <sdsl/int_vector.hpp>
 #include <compact_elias_fano.hpp>
 #include <strict_elias_fano.hpp>

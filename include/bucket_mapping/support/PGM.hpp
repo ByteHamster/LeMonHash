@@ -15,7 +15,6 @@
 
 #pragma once
 
-#include "OptimalPiecewiseLinearModel.hpp"
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -24,6 +23,7 @@
 #include <stdexcept>
 #include <utility>
 #include <vector>
+#include "OptimalPiecewiseLinearModel.hpp"
 
 #define PGM_SUB_EPS(x, epsilon) ((x) <= (epsilon) ? 0 : ((x) - (epsilon)))
 #define PGM_ADD_EPS(x, epsilon, size) ((x) + (epsilon) + 2 >= (size) ? (size) : (x) + (epsilon) + 2)

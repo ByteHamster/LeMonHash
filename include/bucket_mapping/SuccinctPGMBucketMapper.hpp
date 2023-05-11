@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include "support/SuccinctPGM.hpp"
 
 namespace lemonhash {

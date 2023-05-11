@@ -1,5 +1,7 @@
 #pragma once
+
 #include <vector>
+#include <cstdint>
 #include "AlphabetMap.h"
 
 namespace lemonhash {

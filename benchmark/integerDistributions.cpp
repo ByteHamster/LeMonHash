@@ -4,6 +4,7 @@
 #include <LeMonHashHeuristic.hpp>
 #include <LeMonHashVL.hpp>
 #include <bucket_mapping/SuccinctPGMBucketMapper.hpp>
+#include <cstdint>
 #include "simpleMmphfBenchmark.hpp"
 
 std::vector<uint64_t> loadInt64File(std::string &filename, size_t maxN) {

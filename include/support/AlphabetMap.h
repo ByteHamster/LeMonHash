@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 #include <cassert>
+#include <cstdint>
 #include <bit>
 #include <string>
 #include <numeric>
