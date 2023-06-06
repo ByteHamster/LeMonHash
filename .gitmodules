@@ -13,3 +13,6 @@
 [submodule "extlib/pthash"]
 	path = extlib/pthash
 	url = https://github.com/jermp/pthash.git
+[submodule "extlib/tlx"]
+	path = extlib/tlx
+	url = https://github.com/tlx/tlx.git
