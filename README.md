@@ -51,3 +51,5 @@ If you use the project in an academic context or publication, please cite our [p
     year    = {2023},
 }
 ```
+
+The code of the experiments comparing LeMonHash to competitors from the literature is available [here](https://github.com/ByteHamster/MMPHF-Experiments).
