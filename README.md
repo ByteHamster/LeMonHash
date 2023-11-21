@@ -43,12 +43,19 @@ This code is licensed under the [GPLv3](/LICENSE).
 If you use the project in an academic context or publication, please cite our [paper](https://arxiv.org/pdf/2304.11012):
 
 ```bibtex
-@article{ferragina2023learned,
-    title   = {Learned Monotone Minimal Perfect Hashing},
-    author  = {Paolo Ferragina and Hans-Peter Lehmann and Peter Sanders and Giorgio Vinciguerra},
-    journal = {arXiv preprint arXiv:2304.11012},
-    doi     = {10.48550/ARXIV.2304.11012},
-    year    = {2023},
+@inproceedings{DBLP:conf/esa/FerraginaL0V23,
+  author       = {Paolo Ferragina and
+                  Hans{-}Peter Lehmann and
+                  Peter Sanders and
+                  Giorgio Vinciguerra},
+  title        = {Learned Monotone Minimal Perfect Hashing},
+  booktitle    = {{ESA}},
+  series       = {LIPIcs},
+  volume       = {274},
+  pages        = {46:1--46:17},
+  publisher    = {Schloss Dagstuhl - Leibniz-Zentrum f{\"{u}}r Informatik},
+  year         = {2023},
+  doi          = {10.4230/LIPICS.ESA.2023.46}
 }
 ```
 

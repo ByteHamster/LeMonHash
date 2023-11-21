@@ -1,0 +1,35 @@
+cff-version: 1.2.0
+message: "If you use this software in an academic context or publication, please cite it as below."
+authors:
+- family-names: "Ferragina"
+  given-names: "Paolo"
+  orcid: "https://orcid.org/0000-0003-1353-360X"
+- family-names: "Lehmann"
+  given-names: "Hans-Peter"
+  orcid: "https://orcid.org/0000-0002-0474-1805"
+- family-names: "Sanders"
+  given-names: "Peter"
+  orcid: "https://orcid.org/0000-0003-3330-9349"
+- family-names: "Vinciguerra"
+  given-names: "Giorgio"
+  orcid: "https://orcid.org/0000-0003-0328-7791"
+title: "Learned Monotone Minimal Perfect Hashing"
+preferred-citation:
+  type: conference-paper
+  title: "Learned Monotone Minimal Perfect Hashing"
+  authors:
+    - family-names: "Ferragina"
+      given-names: "Paolo"
+      orcid: "https://orcid.org/0000-0003-1353-360X"
+    - family-names: "Lehmann"
+      given-names: "Hans-Peter"
+      orcid: "https://orcid.org/0000-0002-0474-1805"
+    - family-names: "Sanders"
+      given-names: "Peter"
+      orcid: "https://orcid.org/0000-0003-3330-9349"
+    - family-names: "Vinciguerra"
+      given-names: "Giorgio"
+      orcid: "https://orcid.org/0000-0003-0328-7791"
+  doi: "10.4230/LIPICS.ESA.2023.46"
+  journal: "ESA"
+  year: 2023
