@@ -5,8 +5,8 @@
 #include <algorithm>
 #include <iostream>
 #include <Function.h>
+#include <MultiRetrievalDataStructure.hpp>
 #include "support/sequence/BucketOffsets.hpp"
-#include "support/MultiRetrievalDataStructure.hpp"
 #include "bucket_mapping/LinearBucketMapper.hpp"
 #include "bucket_mapping/PGMBucketMapper.hpp"
 #include "bucket_mapping/SuccinctPGMBucketMapper.hpp"
