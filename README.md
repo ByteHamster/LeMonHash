@@ -5,20 +5,28 @@
   <img src="img/lemon_wordmark.png" width="400" alt="Logo">
 </picture>
 
-LeMonHash is a Monotone Minimal Perfect Hash function that combines
-the [PGM-Index](https://github.com/gvinciguerra/PGM-index) for space-efficient ranking
-and [BuRR](https://github.com/lorenzhs/BuRR) for low-overhead retrieval.
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+![Build status](https://github.com/ByteHamster/LeMonHash/actions/workflows/build.yml/badge.svg)
 
-A variant for variable-length strings provides significantly faster queries than competitors.
+A monotone minimal perfect hash function (MMPHF) maps a set S of n input keys to the first n integers without collisions.
+At the same time, it respects the natural order of the input universe.
+In other words, it maps each input key to its rank.
+MMPHFs have many applications in databases and space-efficient data structures.
 
-[<img src="img/plots.png" alt="Screenshot of measurements in paper">](https://arxiv.org/pdf/2304.11012)
+LeMonHash (**Le**arned **Mon**otone Minimal Perfect **Hash**ing) is a novel MMPHF that **learns** about regularities in the input data
+to achieve significant space and performance improvements.
+It uses the [PGM-Index](https://github.com/gvinciguerra/PGM-index) to calculate a learned rank estimate for each key
+and then solves collisions between these estimates using the retrieval data structure [BuRR](https://github.com/lorenzhs/BuRR).
+Compared to competitors that are mostly based on tree-like data structures, LeMonHash is a lot more flat and therefore faster to query.
+LeMonHash dominates most competitors in terms of construction throughput, query throughput, and space consumption -- simultaneously.
+We also give a variant for variable-length strings that achieves significantly faster queries than competitors.
 
-### Requirements
+### Usage
+
+Requirements:
 
 - GCC 11 or later
 - [libxxhash v0.8.0](https://github.com/Cyan4973/xxHash/releases/tag/v0.8.0) or later
-
-### Usage
 
 Clone the repository (as a submodule) and add the following to your `CMakeLists.txt`.
 
@@ -36,6 +44,10 @@ for (uint64_t x : inputData) {
     std::cout << x << ": \t" << hashFunc(x) << std::endl;
 }
 ```
+
+### Query performance
+
+[![Plots preview](https://raw.githubusercontent.com/ByteHamster/LeMonHash/img/plots.png)](https://arxiv.org/pdf/2304.11012)
 
 ### License
 
