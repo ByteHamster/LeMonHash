@@ -47,7 +47,7 @@ for (uint64_t x : inputData) {
 
 ### Query performance
 
-[![Plots preview](https://raw.githubusercontent.com/ByteHamster/LeMonHash/img/plots.png)](https://arxiv.org/pdf/2304.11012)
+[![Plots preview](img/plots.png)](https://arxiv.org/pdf/2304.11012)
 
 ### License
 
