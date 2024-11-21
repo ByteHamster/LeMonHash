@@ -1,11 +1,11 @@
 #include <unordered_set>
 #include <tlx/cmdline_parser.hpp>
-#include <XorShift64.h>
+#include <bytehamster/util/XorShift64.h>
 #include <LeMonHashVL.hpp>
 #include <LeMonHashVLIndexed.hpp>
 #include "simpleMmphfBenchmark.hpp"
 
-std::string stringOfLength(size_t length, util::XorShift64 &prng) {
+std::string stringOfLength(size_t length, bytehamster::util::XorShift64 &prng) {
     std::string key(length, 'x');
     size_t i = 0;
     while (i < (length & ~0xf)) {
@@ -24,7 +24,7 @@ std::vector<std::string> randomUniformStrings(size_t n, size_t length, size_t co
     keys.reserve(n);
     size_t seed = time(nullptr);
     std::cout<<"Seed: "<<seed<<std::endl;
-    util::XorShift64 prng(seed);
+    bytehamster::util::XorShift64 prng(seed);
     std::string prefix = stringOfLength(commonPrefixLength, prng);
     while (keys.size() < n) {
         std::string key = prefix + stringOfLength(length, prng);

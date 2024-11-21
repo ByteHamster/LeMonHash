@@ -7,8 +7,8 @@
 #include <algorithm>
 #include <fstream>
 #include <memory>
-#include <pthash.hpp>
-#include <MurmurHash64.h>
+#include <include/pthash.hpp>
+#include <bytehamster/util/MurmurHash64.h>
 
 #include "bucket_mapping/SuccinctPGMBucketMapper.hpp"
 #include "bucket_mapping/UnalignedPGMBucketMapper.hpp"
@@ -333,7 +333,7 @@ class LeMonHashVL {
                 uint32_t indexInBucket = 0;
                 auto it = begin;
                 while (it != end) {
-                    retrieval.addInput(currentBucketSize, util::MurmurHash64(*it), indexInBucket);
+                    retrieval.addInput(currentBucketSize, bytehamster::util::MurmurHash64(*it), indexInBucket);
                     it++;
                     indexInBucket++;
                 }
@@ -442,7 +442,7 @@ class LeMonHashVL {
                     if (bucketSize == 1) {
                         return bucketOffset;
                     } else {
-                        return bucketOffset + retrieval.query(bucketSize, util::MurmurHash64(string));
+                        return bucketOffset + retrieval.query(bucketSize, bytehamster::util::MurmurHash64(string));
                     }
                 } else {
                     layer++;

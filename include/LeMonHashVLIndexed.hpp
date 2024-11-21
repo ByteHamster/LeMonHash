@@ -310,7 +310,7 @@ class LeMonHashVLIndexed {
                 uint32_t indexInBucket = 0;
                 auto it = begin;
                 while (it != end) {
-                    retrieval.addInput(currentBucketSize, util::MurmurHash64(*it), indexInBucket);
+                    retrieval.addInput(currentBucketSize, bytehamster::util::MurmurHash64(*it), indexInBucket);
                     it++;
                     indexInBucket++;
                 }
@@ -418,7 +418,7 @@ class LeMonHashVLIndexed {
                     if (bucketSize == 1) {
                         return bucketOffset;
                     } else {
-                        return bucketOffset + retrieval.query(bucketSize, util::MurmurHash64(string));
+                        return bucketOffset + retrieval.query(bucketSize, bytehamster::util::MurmurHash64(string));
                     }
                 } else {
                     layer++;

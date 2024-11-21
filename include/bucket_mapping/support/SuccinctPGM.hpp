@@ -151,7 +151,7 @@ private:
                 && !__builtin_mul_overflow(dk, int64_t(y1 - y0), &mul))
                 return int64_t(y0) + mul / dx;
         }
-        return y0 + ((__int128(k) - x0) * (y1 - y0)) / (x1 - x0);
+        return y0 + ((int128(k) - x0) * (y1 - y0)) / (x1 - x0);
     }
 };
 

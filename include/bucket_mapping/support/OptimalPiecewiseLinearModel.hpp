@@ -26,12 +26,23 @@
 #include <utility>
 #include <vector>
 
+namespace lemonhash::pgm {
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic"
+#endif
+using int128 = __int128;
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
+}
+
 namespace lemonhash::pgm::internal {
 
 template<typename T>
 using LargeSigned = typename std::conditional_t<std::is_floating_point_v<T>,
                                                 long double,
-                                                std::conditional_t<(sizeof(T) < 8), int64_t, __int128>>;
+                                                std::conditional_t<(sizeof(T) < 8), int64_t, int128>>;
 
 template<typename X, typename Y>
 class OptimalPiecewiseLinearModel {

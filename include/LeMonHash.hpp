@@ -4,8 +4,9 @@
 #include <cstdint>
 #include <algorithm>
 #include <iostream>
-#include <Function.h>
+#include <bytehamster/util/Function.h>
 #include <MultiRetrievalDataStructure.hpp>
+
 #include "support/sequence/BucketOffsets.hpp"
 #include "bucket_mapping/LinearBucketMapper.hpp"
 #include "bucket_mapping/PGMBucketMapper.hpp"

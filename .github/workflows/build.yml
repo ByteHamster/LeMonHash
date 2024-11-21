@@ -6,14 +6,19 @@ on:
 
 jobs:
   build:
-    name: Build
-    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        version: [10, 11, 12, 13]
+    name: Build (GCC ${{ matrix.version }})
+    runs-on: ubuntu-24.04
     steps:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install --assume-yes --no-install-recommends build-essential cmake git autoconf libtbb-dev libxxhash-dev libboost-dev
-      - uses: actions/checkout@v2
+          sudo apt-get install --assume-yes --no-install-recommends ca-certificates cmake git libtbb-dev gcc-${{ matrix.version }} g++-${{ matrix.version }}
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-${{ matrix.version }} ${{ matrix.version }}
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-${{ matrix.version }} ${{ matrix.version }}
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
       - name: Build

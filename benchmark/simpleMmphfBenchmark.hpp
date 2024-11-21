@@ -2,10 +2,10 @@
 
 #include <ctime>
 #include <chrono>
-#include <XorShift64.h>
 #include <vector>
 #include <iostream>
 #include <malloc.h>
+#include <bytehamster/util/XorShift64.h>
 
 template <typename MMphf, typename key_t>
 void simpleMmphfBenchmark(std::vector<key_t> &inputData, std::string &dataset, size_t numQueries) {
@@ -27,7 +27,7 @@ void simpleMmphfBenchmark(std::vector<key_t> &inputData, std::string &dataset, s
 
     std::cout<<"\r\033[K"<<"Benchmarking "<<MMphf::name()<<std::flush;
     size_t N = inputData.size();
-    util::XorShift64 prng(time(nullptr));
+    bytehamster::util::XorShift64 prng(time(nullptr));
     uint64_t h = prng();
     std::chrono::steady_clock::time_point beginQuery = std::chrono::steady_clock::now();
     for (size_t i = 0; i < numQueries; i++) {

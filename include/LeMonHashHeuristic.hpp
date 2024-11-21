@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <algorithm>
 #include <iostream>
-#include <Function.h>
+#include <bytehamster/util/Function.h>
 #include <MultiRetrievalDataStructure.hpp>
 #include "support/sequence/BucketOffsets.hpp"
 #include "bucket_mapping/LinearBucketMapper.hpp"
@@ -23,10 +23,10 @@ class LeMonHashHeuristic {
     public:
         const size_t N;
     private:
-        MultiRetrievalDataStructure<retrievalCoeffBits> retrievalDataStructure;
-        BucketOffsets bucketOffsets;
         const size_t segments;
         EliasFanoM eliasFano;
+        BucketOffsets bucketOffsets;
+        MultiRetrievalDataStructure<retrievalCoeffBits> retrievalDataStructure;
     public:
         static std::string name() {
             return std::string("LeMonHash")
