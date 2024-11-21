@@ -15,7 +15,8 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install --assume-yes --no-install-recommends ca-certificates cmake git libtbb-dev gcc-${{ matrix.version }} g++-${{ matrix.version }}
+          sudo apt-get install --assume-yes --no-install-recommends ca-certificates cmake git libtbb-dev libboost-all-dev
+          sudo apt-get install --assume-yes --no-install-recommends gcc-${{ matrix.version }} g++-${{ matrix.version }}
           sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-${{ matrix.version }} ${{ matrix.version }}
           sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-${{ matrix.version }} ${{ matrix.version }}
       - uses: actions/checkout@v4

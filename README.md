@@ -26,7 +26,7 @@ We also give a variant for variable-length strings that achieves significantly f
 Requirements:
 
 - GCC 11 or later
-- [libxxhash v0.8.0](https://github.com/Cyan4973/xxHash/releases/tag/v0.8.0) or later
+- boost
 
 Clone the repository (as a submodule) and add the following to your `CMakeLists.txt`.
 
