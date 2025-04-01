@@ -140,7 +140,8 @@ class LeMonHashVLIndexed {
         size_t N = 0;
         std::vector<std::pair<uint64_t, TreeNode>> treeNodesInput;
         std::vector<TreeNode> treeNodes;
-        using Mphf = pthash::single_phf<pthash::murmurhash2_64, pthash::compact_compact, true>;
+        using Mphf = pthash::single_phf<pthash::murmurhash2_64, pthash::skew_bucketer,
+                pthash::compact_compact, true, pthash::pthash_search_type::xor_displacement>;
         Mphf treeNodesMphf;
         std::vector<DuplicateFilterRank<PartitionedEliasFano>> bucketOffsets;
         AlphabetMapsCollection alphabetMaps;
@@ -169,11 +170,11 @@ class LeMonHashVLIndexed {
                 std::construct_at(&treeNodes[0], std::move(treeNodesInput.front().second));
             } else {
                 pthash::build_configuration config;
-                config.c = 7.0;
+                config.lambda =67.0;
                 config.alpha = 0.99;
                 config.num_threads = 1;
-                config.minimal_output = true;
-                config.verbose_output = false;
+                config.minimal = true;
+                config.verbose = false;
                 treeNodesMphf.build_in_internal_memory(mphfInput.begin(), mphfInput.size(), config);
 
                 treeNodes.resize(treeNodesInput.size());

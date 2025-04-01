@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.25)
+cmake_minimum_required(VERSION 3.25...4.0)
 project(LeMonHash)
 
 if(TARGET LeMonHash)
@@ -28,11 +28,10 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/extlib/ds2i/ds2i_config.hpp.in
 add_library(ds2i INTERFACE)
 target_include_directories(ds2i SYSTEM INTERFACE extlib/ds2i)
 
-add_subdirectory(extlib/sdsl-lite/external SYSTEM EXCLUDE_FROM_ALL)
-add_subdirectory(extlib/sdsl-lite/include SYSTEM EXCLUDE_FROM_ALL)
-add_subdirectory(extlib/sdsl-lite/lib SYSTEM EXCLUDE_FROM_ALL)
-target_compile_options(sdsl PRIVATE -w)
-target_include_directories(sdsl SYSTEM INTERFACE extlib/sdsl-lite/include)
+# Only parts of sdsl to avoid using old cmake dependencies
+set(sdsl_dir ${CMAKE_CURRENT_SOURCE_DIR}/extlib/sdsl-lite/lib)
+add_library(sdsl SHARED ${sdsl_dir}/bits.cpp ${sdsl_dir}/memory_management.cpp ${sdsl_dir}/util.cpp ${sdsl_dir}/ram_fs.cpp)
+target_include_directories(sdsl SYSTEM PUBLIC extlib/sdsl-lite/include)
 
 add_library(LeMonHash INTERFACE)
 target_compile_features(LeMonHash INTERFACE cxx_std_20)
